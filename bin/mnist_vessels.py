@@ -217,7 +217,7 @@ def main(model='mlp', num_epochs=500):
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         print('p_examples.mean1: {}'.format(p_examples.mean()))
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
-        p_examples = p_examples/(1/1000000+p_examples.max())
+        p_examples = p_examples/(1/1000000+p_examples.min())
         print('p_examples.shape: {}'.format(p_examples.shape))
         print('p_examples.mean: {}'.format(p_examples.mean()))
         print('p_examples.max: {}'.format(p_examples.max()))
@@ -290,7 +290,7 @@ def main(model='mlp', num_epochs=500):
     print('Show test image... ')
     y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
     print('y_preds[0] :{}'.format(y_preds[0]))
-    output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape)
+    output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
     aux_image = output_image
     print('--------------Imagen resultante--------------')
     img = numpy.floor(output_image*255)
