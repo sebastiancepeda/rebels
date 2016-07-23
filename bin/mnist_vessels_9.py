@@ -13,6 +13,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 import glob, os
+import utils
 
 ImageShape      = (584,565,3)
 PatternShape    = (584,565)
@@ -22,123 +23,6 @@ alpha                = 1 # in [0.01,100]
 beta                  = 0.1
 gamma              = 10
 
-'''
-Metodo 
-'''
-def balance(x,  t):
-    nv  = t.sum()
-    nf   = t.size - nv
-    t2 = numpy.zeros((numpy.floor(nv*2*beta), 1))
-    x2 = numpy.zeros((numpy.floor(nv*2*beta), winSize[0],  winSize[1],  ImageShape[2]))
-    c = 0
-    for i in numpy.arange(t.size):
-        if (c == (t2.size-1)):
-            x2[c] = x[x.shape[0]-1]
-            t2[c]  = t[t.shape[0]-1]
-            print('t2.size')
-            print(t2.size)
-            return x2,  t2
-        if(t[i]==1):
-            if(numpy.random.rand() < beta*nf/(nv+nf)):
-                x2[c] = x[i]
-                t2[c] = 1
-                c += 1
-        if(t[i]==0):
-            if(numpy.random.rand() < beta*nv/(nv+nf)):
-                x2[c] = x[i]
-                t2[c]  = 0
-                c += 1
-    print('t2.size')
-    print(t2.size)
-    return x2,  t2
-
-'''
-Si output == 0, se pasa por la imagen, devolviendo una lista de ventanas en torno a cada pixel. 
-Si output == 1, se devuelve una lista de 0's y 1's para representar fondo o vaso sanguineo. 
-'''
-def sliding_window(image, stepSize, w, dim,output):
-    n1 = image.shape[0]
-    n2 = image.shape[1]
-    diff = (w[0]-1)/2
-    valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
-    if(output == 1):
-        value = numpy.zeros((valid_windows,1))
-        mean_sample = numpy.zeros((1,1))
-    else:
-        value = numpy.zeros((valid_windows,w[0],w[1],dim))
-        mean_sample = numpy.zeros((w[0],w[1],dim))
-    c = 0
-    # slide a window across the image
-    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, stepSize):
-        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, stepSize):
-            # If it is the groundtruth that is being streamed
-            if(output == 1):
-                sample = image[x,y]
-                if(sample >= 127):
-                    sample = 1
-                else:
-                    sample = 0
-                value[c,] = sample
-            else:
-                window = image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
-                if window.shape[0] != w[0] or window.shape[1] != w[1]:
-                    continue
-                sample = window
-                value[c,] = sample
-            c += 1
-            mean_sample += sample/c
-    return value# - mean_sample
-
-def sliding_window2(image, stepSize, w, dim):
-    n1 = image.shape[0]
-    n2 = image.shape[1]
-    diff = (w[0]-1)/2
-    valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
-    value = numpy.zeros((valid_windows,1))
-    c = 0
-    # slide a window across the image
-    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, stepSize):
-        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, stepSize):
-            # If it is the groundtruth that is being streamed
-            sample = image[x,y]
-            value[c,] = sample
-            c += 1
-    return value
-
-def reconstruct_image(y_preds,w):
-    a = 0
-    output_image = numpy.zeros((PatternShape[0],PatternShape[1]))
-    for x in xrange(w[0]//2, PatternShape[0]-w[0]//2, 1):
-        for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
-            if(y_preds[a][0][0] > y_preds[a][0][1]*alpha):
-                output_image[x][y] = 0
-            else:
-                output_image[x][y] = 1
-            a += 1
-    return output_image
-    
-def reconstruct_image_2(e_preds,w=winSize):
-    a = 0
-    output_image = numpy.zeros((PatternShape[0],PatternShape[1]))
-    for x in xrange(w[0]//2, PatternShape[0]-w[0]//2, 1):
-        for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
-            output_image[x][y] = e_preds[a][0]
-            a += 1
-    output_image = output_image - output_image.min()
-    output_image = output_image / output_image.max()*255    
-    return output_image
-    
-def reconstruct_image_3(e_preds,w=winSize):
-    a = 0
-    output_image = numpy.zeros((PatternShape[0],PatternShape[1]))
-    for x in xrange(w[0]//2, PatternShape[0]-w[0]//2, 1):
-        for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
-            output_image[x][y] = e_preds[a]
-            a += 1
-    output_image = output_image - output_image.min()
-    output_image = output_image / output_image.max()*255    
-    return output_image
-    
 def load_data():
     #features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
     #features 	   = Image.open('../DRIVE/21a.gif','r')
@@ -154,11 +38,11 @@ def load_data():
     image2     = numpy.fromstring(image2.tostring(), dtype='uint8', count=-1, sep='')
     image2     = numpy.reshape(image2,PatternShape,'A')
     
-    train_set  = sliding_window(features, stepSize=1, w=winSize, dim=ImageShape[2],output=0)
+    train_set  = utils.sliding_window(features, stepSize=1, w=winSize, dim=ImageShape[2],output=0)
     valid_set  = train_set
     test_set   = train_set
     
-    train_set_t  = sliding_window(image2, stepSize=1, w=winSize, dim=1,output=1)
+    train_set_t  = utils.sliding_window(image2, stepSize=1, w=winSize, dim=1,output=1)
     valid_set_t  = train_set_t
     test_set_t   = train_set_t
     
@@ -177,9 +61,6 @@ def load_data():
     train_set_x, train_set_y = shared_dataset(train_set, train_set_t)
     
     return train_set_x, train_set_y, valid_set_x, valid_set_y,test_set_x, test_set_y
-
-def build_mlp(input_var=None):
-    return build_custom_mlp(input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5)
 
 def build_custom_mlp(input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
     network = lasagne.layers.InputLayer(shape=(None, ImageShape[2], winSize[0], winSize[1]), input_var=input_var)
@@ -216,9 +97,7 @@ def main(model='mlp', num_epochs=500):
     target_var = T.dvector('targets')
     p = T.dvector('p')
     print("Building model and compiling functions...")
-    if model == 'mlp':
-        network = build_mlp(input_var)
-    elif model.startswith('custom_mlp:'):
+    if model.startswith('custom_mlp:'):
         depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
         network = build_custom_mlp(input_var, int(depth), int(width), float(drop_in), float(drop_hid))
     else:
@@ -335,7 +214,7 @@ def main(model='mlp', num_epochs=500):
         print('x.shape: {}'.format(training_data[0].shape))
         print('y.shape: {}'.format(training_data[1].shape))
         print('p_total.mean: {}'.format(p_total.mean()))
-        p_examples = sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
+        p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         print('p_examples.mean1: {}'.format(p_examples.mean()))
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.max())
@@ -357,12 +236,12 @@ def main(model='mlp', num_epochs=500):
             os.remove(f)
         print('save input image... ')###########################################
         x_image = [inputs[0][inputs.shape[1]/2+1][inputs.shape[2]/2+1][1] for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-        x_image = reconstruct_image_3(x_image,w=winSize)
+        x_image = utils.reconstruct_image_3(x_image,w=winSize,PatternShape=PatternShape)
         x_image = numpy.floor(x_image)
         cv2.imwrite('debug/0-x_image.png',x_image)
         print('save target image... ')##########################################
         t_image = [targets for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-        t_image = reconstruct_image_2(t_image,w=winSize)
+        t_image = utils.reconstruct_image_2(t_image,w=winSize, PatternShape=PatternShape)
         t_image = numpy.floor(t_image)
         cv2.imwrite('debug/0-t_image.png',t_image)
         for i in numpy.arange(num_epochs):            
@@ -387,17 +266,17 @@ def main(model='mlp', num_epochs=500):
                 callback(w_t)
                 print('save test image... ')
                 y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                output_image = reconstruct_image(y_preds,w=winSize)
+                output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
                 img = numpy.floor(output_image*255)
                 cv2.imwrite('debug/{}-image.png'.format(i),img)
                 print('save error image... ')
                 e_preds   = [(output_model(inputs)[0] - targets) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                e_image = reconstruct_image_2(e_preds,w=winSize)
+                e_image = utils.reconstruct_image_2(e_preds,w=winSize, PatternShape=PatternShape)
                 e_img = numpy.floor(e_image)
                 cv2.imwrite('debug/{}-error_image.png'.format(i),e_img)
                 print('save acc image... ')
                 acc_preds   = [((output_model(inputs)[0][0]>output_model(inputs)[0][1]*alpha).sum()) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                acc_image = reconstruct_image_3(acc_preds,w=winSize)
+                acc_image = utils.reconstruct_image_3(acc_preds,w=winSize,PatternShape=PatternShape)
                 acc_image = numpy.floor(acc_image)
                 cv2.imwrite('debug/{}-acc_image.png'.format(i),acc_image)
                 p = (acc_image/255)*p*0.5+(1-acc_image/255)*p*2+1/1000000
@@ -411,7 +290,7 @@ def main(model='mlp', num_epochs=500):
     print('Show test image... ')
     y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
     print('y_preds[0] :{}'.format(y_preds[0]))
-    output_image = reconstruct_image(y_preds,w=winSize)
+    output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape)
     aux_image = output_image
     print('--------------Imagen resultante--------------')
     img = numpy.floor(output_image*255)
