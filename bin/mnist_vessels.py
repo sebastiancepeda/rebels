@@ -209,7 +209,7 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 100):
+    def sampleData(training_data,  p_total,  n_samples = 10000):
         print('p_total.mean: {}'.format(p_total.mean()))
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
@@ -225,17 +225,13 @@ def main(model='mlp', num_epochs=500):
         y_out = numpy.zeros((n_samples,))
         data_out = numpy.zeros((x.shape[0],))
         p_dummy = numpy.zeros((n_samples,))+1
-        j = 0
-        for i in numpy.arange(x.shape[0]):
-            if(numpy.random.rand(1) < p_examples[j]):
-                x_out[j] = x[i]
-                y_out[j] = y[i]
-                data_out[j] = 1
-                j += 1
-                if(j >= n_samples):
-                    break
+        inds = (-p_examples+numpy.random.rand(p_examples.shape[0], )*p_examples.mean()).argsort()
+        x_out = x[inds[0:n_samples],:,:,:]
+        y_out = y[inds[0:n_samples]]
+        data_out[inds[0:n_samples]] = 1
         print("x_out.shape: {}".format(x_out.shape))
         print("y_out.shape: {}".format(y_out.shape))
+        print('data_out.sum(): {}'.format(data_out.sum()))
         return (x_out, y_out, p_dummy,  data_out)
     
     def optimizer(func, x0, fprime, training_data, callback):
@@ -264,7 +260,7 @@ def main(model='mlp', num_epochs=500):
             dedw = fprime(w_t , *args)
             g_t = dedw/(1.0/1000000+numpy.abs(dedw).max())
             #g_t = dedw
-            m_t = 0.0*m_t + g_t*0.9
+            m_t = 0.0*m_t + g_t*0.01
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
             lamda_t = 0.9
             w_t  = w_t + m_t*lamda_t
@@ -282,7 +278,8 @@ def main(model='mlp', num_epochs=500):
                 callback(w_t)
                 print('save data image... ')
                 data_out = args[3]
-                im_data = numpy.pad(numpy.reshape(data_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+                print('data_out.shape: {}'.format(data_out.shape))
+                im_data = numpy.pad(numpy.reshape(data_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 cv2.imwrite('debug/data/{}-image.png'.format(i),im_data*255)
                 print('save test image... ')
                 y_out = output_model(X_val)
