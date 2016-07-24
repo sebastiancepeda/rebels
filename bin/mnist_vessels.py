@@ -209,7 +209,7 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 1000):
+    def sampleData(training_data,  p_total,  n_samples = 10000):
         print('p_total.mean: {}'.format(p_total.mean()))
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
@@ -242,7 +242,7 @@ def main(model='mlp', num_epochs=500):
         args = sampleData(training_data,  p)
         e_t = func(w_t , *args)
         print('deleting images... ')###########################################
-        for f in glob.glob("debug/*.png"):
+        for f in glob.glob("debug/*/*.png"):
             os.remove(f)
         print('save input image... ')###########################################
         idx_x = X_val.shape[1]//2
@@ -260,7 +260,7 @@ def main(model='mlp', num_epochs=500):
             dedw = fprime(w_t , *args)
             g_t = dedw/(1.0/1000000+numpy.abs(dedw).max())
             #g_t = dedw
-            m_t = 0.8*m_t + g_t*0.1
+            m_t = 0.1*m_t + g_t*0.9
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
             lamda_t = 0.9
             w_t  = w_t + m_t*lamda_t
@@ -282,20 +282,20 @@ def main(model='mlp', num_epochs=500):
                 y_out = y_out[:,:,1:3]
                 output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
                 img = numpy.floor(output_image*255)
-                cv2.imwrite('debug/{}-image.png'.format(i),img)
+                cv2.imwrite('debug/y_out/{}-image.png'.format(i),img)
                 print('save error image... ')
                 e_preds = y_out[:, :, 1] - targ
                 e_img = e_preds*e_preds
                 e_img = numpy.floor(e_img*255)
-                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*255)
+                cv2.imwrite('debug/error/{}-error_image.png'.format(i),e_img*255)
                 print('save acc image... ')
                 a = output_image*targ+(1-output_image)*(1-targ)
-                cv2.imwrite('debug/{}-acc_image.png'.format(i),a*255)
-                p = a*p*0.1+(1-a)*p*10
+                cv2.imwrite('debug/acc/{}-acc_image.png'.format(i),a*255)
+                p = a*p*0.5+(1-a)*p*2
                 p_image = p
                 p_image = p_image - p_image.min()
                 p_image = p_image / p_image.max()
-                cv2.imwrite('debug/{}-p_image.png'.format(i),numpy.floor(p_image*255))
+                cv2.imwrite('debug/p/{}-p_image.png'.format(i),numpy.floor(p_image*255))
     
     optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
     
