@@ -209,15 +209,30 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total):
+    def sampleData(training_data,  p_total,  n_samples = 1000):
         print('p_total.mean: {}'.format(p_total.mean()))
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
-        p_examples = p_examples/(1/1000000+p_examples.min())
+        p_examples = p_examples/(1/1000000+p_examples.sum())
         print('p_examples.shape: {}'.format(p_examples.shape))
         print('p_examples.mean: {}'.format(p_examples.mean()))
         print('p_examples.max: {}'.format(p_examples.max()))
-        return (training_data[0], training_data[1], p_examples)
+        x = training_data[0]
+        y = training_data[1]
+        print('x.shape: {}'.format(x.shape))
+        print('y.shape: {}'.format(y.shape))
+        x_out = numpy.zeros((n_samples, x.shape[1], x.shape[2], x.shape[3]))
+        y_out = numpy.zeros((n_samples,))
+        p_dummy = numpy.zeros((n_samples,))+1
+        j = 0
+        for i in numpy.arange(x.shape[0]):
+            if(numpy.random.rand(1) < p_examples[j]):
+                x_out[j] = x[i]
+                y_out[j] = y[i]
+                j += 1
+                if(j >= n_samples):
+                    break
+        return (x_out, y_out, p_dummy)
     
     def optimizer(func, x0, fprime, training_data, callback):
         print('Optimizer method. ')
