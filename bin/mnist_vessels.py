@@ -24,9 +24,9 @@ beta                  = 0.1
 gamma              = 10
 
 def load_data():
-    #features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
+    features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
     #features 	   = Image.open('../DRIVE/21a.gif','r')
-    features 	   = Image.open('../DRIVE/21d.bmp','r')
+    ##features 	   = Image.open('../DRIVE/21d.bmp','r')
     #features 	 = Image.open('../DRIVE/AddBorder21.png','r')
     #features 	 = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
     
@@ -272,7 +272,7 @@ def main(model='mlp', num_epochs=500):
             print("-----------------------------------------------------------")
             #if(numpy.abs(g_t).mean() < 1/1000000):
             #    break
-            if(i % 10 == 0):
+            if(i % 1 == 0):
                 callback(w_t)
                 print('save test image... ')
                 y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
@@ -283,13 +283,14 @@ def main(model='mlp', num_epochs=500):
                 e_preds   = [(output_model(inputs)[0] - targets) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
                 e_image = utils.reconstruct_image_2(e_preds,w=winSize, PatternShape=PatternShape)
                 e_img = numpy.floor(e_image)
-                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img)
+                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*e_img)
                 print('save acc image... ')
                 acc_preds   = [((output_model(inputs)[0][0]>output_model(inputs)[0][1]*alpha).sum()) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
                 acc_image = utils.reconstruct_image_3(acc_preds,w=winSize,PatternShape=PatternShape)
                 acc_image = numpy.floor(acc_image)
                 cv2.imwrite('debug/{}-acc_image.png'.format(i),acc_image)
-                p = (acc_image/255)*p*0.5+(1-acc_image/255)*p*2+1/1000000
+                a = acc_image/255
+                p = a*p*0.1+(1-a)*p*10
                 p_image = p
                 p_image = p_image - p_image.min()
                 p_image = p_image / p_image.max()
