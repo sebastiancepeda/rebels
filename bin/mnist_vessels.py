@@ -210,19 +210,14 @@ def main(model='mlp', num_epochs=500):
         return phi[numpy.argmin(e_phi)]
         
     def sampleData(training_data,  p_total):
-        print('p_total.shape: {}'.format(p_total.shape))
-        print('x.shape: {}'.format(training_data[0].shape))
-        print('y.shape: {}'.format(training_data[1].shape))
         print('p_total.mean: {}'.format(p_total.mean()))
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
-        print('p_examples.mean1: {}'.format(p_examples.mean()))
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.min())
         print('p_examples.shape: {}'.format(p_examples.shape))
         print('p_examples.mean: {}'.format(p_examples.mean()))
         print('p_examples.max: {}'.format(p_examples.max()))
         return (training_data[0], training_data[1], p_examples)
-    
     
     def optimizer(func, x0, fprime, training_data, callback):
         print('Optimizer method. ')
