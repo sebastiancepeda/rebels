@@ -102,8 +102,6 @@ def reconstruct_image_2(e_preds,w, PatternShape):
         for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
             output_image[x][y] = e_preds[a][0]
             a += 1
-    output_image = output_image - output_image.min()
-    output_image = output_image / output_image.max()*255    
     return output_image
     
 def reconstruct_image_3(e_preds,w,PatternShape):
@@ -113,7 +111,5 @@ def reconstruct_image_3(e_preds,w,PatternShape):
         for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
             output_image[x][y] = e_preds[a]
             a += 1
-    output_image = output_image - output_image.min()
-    output_image = output_image / output_image.max()*255    
     return output_image
     
