@@ -253,7 +253,7 @@ def main(model='mlp', num_epochs=500):
         t_image = [targets for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
         t_image = utils.reconstruct_image_2(t_image,w=winSize, PatternShape=PatternShape)
         t_image = numpy.floor(t_image)
-        cv2.imwrite('debug/0-t_image.png',t_image)
+        cv2.imwrite('debug/0-t_image.png',t_image*255)
         for i in numpy.arange(num_epochs):            
             dedw = fprime(w_t , *args)
             g_t = dedw/(1.0/1000000+numpy.abs(dedw).max())
@@ -283,7 +283,7 @@ def main(model='mlp', num_epochs=500):
                 e_preds   = [(output_model(inputs)[0] - targets) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
                 e_image = utils.reconstruct_image_2(e_preds,w=winSize, PatternShape=PatternShape)
                 e_img = numpy.floor(e_image)
-                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*e_img)
+                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*e_img*255)
                 print('save acc image... ')
                 targ = utils.reconstruct_image_3(y_val,w=winSize, PatternShape=PatternShape)
                 targ = targ/255
