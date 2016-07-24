@@ -245,14 +245,16 @@ def main(model='mlp', num_epochs=500):
         for f in glob.glob("debug/*.png"):
             os.remove(f)
         print('save input image... ')###########################################
-        x_image = [inputs[0][inputs.shape[1]/2+1][inputs.shape[2]/2+1][1] for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-        x_image = utils.reconstruct_image_3(x_image,w=winSize,PatternShape=PatternShape)
+        idx_x = X_val.shape[1]//2
+        idx_y = X_val.shape[2]//2
+        idx_z = X_val.shape[3]//2
+        x_out = X_val[:, idx_x, idx_y, idx_z]
+        x_image = numpy.pad(numpy.reshape(x_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         x_image = numpy.floor(x_image)
         cv2.imwrite('debug/0-x_image.png',x_image)
         print('save target image... ')##########################################
-        t_image = [targets for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-        t_image = utils.reconstruct_image_2(t_image,w=winSize, PatternShape=PatternShape)
-        t_image = numpy.floor(t_image)
+        targ = numpy.pad(numpy.reshape(y_val,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        t_image = numpy.floor(targ)
         cv2.imwrite('debug/0-t_image.png',t_image*255)
         for i in numpy.arange(num_epochs):            
             dedw = fprime(w_t , *args)
@@ -275,22 +277,20 @@ def main(model='mlp', num_epochs=500):
             if(i % 1 == 0):
                 callback(w_t)
                 print('save test image... ')
-                y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
+                y_out = output_model(X_val)
+                y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+                y_out = y_out[:,:,1:3]
+                output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
                 img = numpy.floor(output_image*255)
                 cv2.imwrite('debug/{}-image.png'.format(i),img)
                 print('save error image... ')
-                e_preds   = [(output_model(inputs)[0] - targets) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                e_image = utils.reconstruct_image_2(e_preds,w=winSize, PatternShape=PatternShape)
-                e_img = numpy.floor(e_image)
-                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*e_img*255)
+                e_preds = y_out[:, :, 1] - targ
+                e_img = e_preds*e_preds
+                e_img = numpy.floor(e_img*255)
+                cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*255)
                 print('save acc image... ')
-                targ = utils.reconstruct_image_3(y_val,w=winSize, PatternShape=PatternShape)
-                targ = targ/255
-                acc_image = output_image*targ+(1-output_image)*(1-targ)
-                acc_image = numpy.floor(acc_image)
-                cv2.imwrite('debug/{}-acc_image.png'.format(i),acc_image*255)
-                a = acc_image
+                a = output_image*targ+(1-output_image)*(1-targ)
+                cv2.imwrite('debug/{}-acc_image.png'.format(i),a*255)
                 p = a*p*0.1+(1-a)*p*10
                 p_image = p
                 p_image = p_image - p_image.min()
