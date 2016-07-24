@@ -285,11 +285,12 @@ def main(model='mlp', num_epochs=500):
                 e_img = numpy.floor(e_image)
                 cv2.imwrite('debug/{}-error_image.png'.format(i),e_img*e_img)
                 print('save acc image... ')
-                acc_preds   = [((output_model(inputs)[0][0]>output_model(inputs)[0][1]*alpha).sum()) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
-                acc_image = utils.reconstruct_image_3(acc_preds,w=winSize,PatternShape=PatternShape)
+                targ = utils.reconstruct_image_3(y_val,w=winSize, PatternShape=PatternShape)
+                targ = targ/255
+                acc_image = output_image*targ+(1-output_image)*(1-targ)
                 acc_image = numpy.floor(acc_image)
-                cv2.imwrite('debug/{}-acc_image.png'.format(i),acc_image)
-                a = acc_image/255
+                cv2.imwrite('debug/{}-acc_image.png'.format(i),acc_image*255)
+                a = acc_image
                 p = a*p*0.1+(1-a)*p*10
                 p_image = p
                 p_image = p_image - p_image.min()
