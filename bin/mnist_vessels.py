@@ -26,7 +26,7 @@ gamma              = 10
 def load_data():
     features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
     #features 	   = Image.open('../DRIVE/21a.gif','r')
-    ##features 	   = Image.open('../DRIVE/21d.bmp','r')
+    #features 	   = Image.open('../DRIVE/21d.bmp','r')
     #features 	 = Image.open('../DRIVE/AddBorder21.png','r')
     #features 	 = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
     
@@ -104,14 +104,12 @@ def main(model='mlp', num_epochs=500):
         print("Unrecognized model type %r." % model)
         return
     prediction = lasagne.layers.get_output(network)
-    t_var = T.stack([target_var,1-target_var], axis=1)
-    error = prediction - t_var
-    error = (error*error).mean(axis=1)
-    loss = error*p
-    loss = loss.mean()
+    error = prediction[:, 1] + target_var
+    error = (error*error)
+    loss = error.mean()
     params = lasagne.layers.get_all_params(network, trainable=True)
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
-    test_loss = ((test_prediction-t_var)*(test_prediction-t_var)).mean()
+    test_loss = ((test_prediction[:, 1]-target_var)*(test_prediction[:, 1]-target_var)).mean()
     test_loss = test_loss.mean()
     a = numpy.zeros((2,2))
     a[0][0]     = 1
@@ -121,7 +119,7 @@ def main(model='mlp', num_epochs=500):
     thresholded_prediction = T.dot(test_prediction,a)
     thresholded_prediction = T.argmax(test_prediction, axis=1)
     test_acc = T.mean(T.eq(thresholded_prediction, target_var),dtype=theano.config.floatX)
-    train_fn = theano.function([input_var, target_var,  p], [loss,  error,  p])
+    train_fn = theano.function([input_var, target_var], [loss,  error])
     val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
     output_model = theano.function([input_var], prediction)
     def params_giver():
@@ -136,8 +134,8 @@ def main(model='mlp', num_epochs=500):
         gs = []
         for w in params:
             grad = T.grad(loss,  w)
-            grad_fn = theano.function([input_var, target_var, p], grad)
-            gs = numpy.append(gs,  grad_fn(x,  t, p_data))
+            grad_fn = theano.function([input_var, target_var], grad)
+            gs = numpy.append(gs,  grad_fn(x,  t))
         return gs
     '''
     Method that receives the new set of weights 
@@ -168,7 +166,7 @@ def main(model='mlp', num_epochs=500):
         t = args[1]
         p_data = args[2]
         params_updater(params)
-        return train_fn(x,  t, p_data)
+        return train_fn(x,  t)
     
     '''
     Method that receives the weights (params), training data (args)
@@ -209,20 +207,12 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 10000):
-        print('p_total.mean: {}'.format(p_total.mean()))
+    def sampleData(training_data,  p_total,  n_samples = 100):
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.sum())
-        print('p_examples.shape: {}'.format(p_examples.shape))
-        print('p_examples.mean: {}'.format(p_examples.mean()))
-        print('p_examples.max: {}'.format(p_examples.max()))
         x = training_data[0]
         y = training_data[1]
-        print('x.shape: {}'.format(x.shape))
-        print('y.shape: {}'.format(y.shape))
-        x_out = numpy.zeros((n_samples, x.shape[1], x.shape[2], x.shape[3]))
-        y_out = numpy.zeros((n_samples,))
         data_out = numpy.zeros((x.shape[0],))
         p_dummy = numpy.zeros((n_samples,))+1
         inds = (-p_examples+numpy.random.rand(p_examples.shape[0], )*p_examples.mean()).argsort()
@@ -233,6 +223,7 @@ def main(model='mlp', num_epochs=500):
         print("y_out.shape: {}".format(y_out.shape))
         print('data_out.sum(): {}'.format(data_out.sum()))
         return (x_out, y_out, p_dummy,  data_out)
+        #return (x, y, p_dummy,  data_out)
     
     def optimizer(func, x0, fprime, training_data, callback):
         print('Optimizer method. ')
@@ -249,41 +240,44 @@ def main(model='mlp', num_epochs=500):
         idx_y = X_val.shape[2]//2
         idx_z = X_val.shape[3]//2
         x_out = X_val[:, idx_x, idx_y, idx_z]
-        x_image = numpy.pad(numpy.reshape(x_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        x_image = numpy.pad(numpy.reshape(x_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         x_image = numpy.floor(x_image)
         cv2.imwrite('debug/0-x_image.png',x_image)
         print('save target image... ')##########################################
-        targ = numpy.pad(numpy.reshape(y_val,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        targ = numpy.pad(numpy.reshape(y_val,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         t_image = numpy.floor(targ)
         cv2.imwrite('debug/0-t_image.png',t_image*255)
         for i in numpy.arange(num_epochs):            
             dedw = fprime(w_t , *args)
-            g_t = dedw/(1.0/1000000+numpy.abs(dedw).max())
+            g_t = dedw/(numpy.abs(dedw).max())
             #g_t = dedw
-            m_t = 0.0*m_t + g_t*0.01
+            m_t = 0.0*m_t + g_t*0.00001
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
             lamda_t = 0.9
-            w_t  = w_t + m_t*lamda_t
+            w_t  = w_t - m_t*lamda_t
             e_t = func(w_t , *args)
+            print('e_t[1].shape: {}'.format(e_t[1].shape))
+            print('error_T image... ')
+            #error_T = numpy.pad(numpy.reshape(e_t[1],(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+            #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
             args = sampleData(training_data, p)
             print("lamda_t: {}".format(lamda_t))
             print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
             print("i: {}, e_t: {}".format(i, e_t[0]))
             print("error: {}".format(e_t[1].mean()))
-            print("p_weights: {}({})".format(e_t[2].mean(), e_t[2].shape))
             print("-----------------------------------------------------------")
             #if(numpy.abs(g_t).mean() < 1/1000000):
             #    break
             if(i % 1 == 0):
-                callback(w_t)
+                #callback(w_t)
                 print('save data image... ')
                 data_out = args[3]
                 print('data_out.shape: {}'.format(data_out.shape))
-                im_data = numpy.pad(numpy.reshape(data_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+                im_data = numpy.pad(numpy.reshape(data_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 cv2.imwrite('debug/data/{}-image.png'.format(i),im_data*255)
                 print('save test image... ')
                 y_out = output_model(X_val)
-                y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]//2-1,PatternShape[1]-winSize[1]//2-1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+                y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 y_out = y_out[:,:,1:3]
                 output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
                 img = numpy.floor(output_image*255)
@@ -296,7 +290,7 @@ def main(model='mlp', num_epochs=500):
                 print('save acc image... ')
                 a = output_image*targ+(1-output_image)*(1-targ)
                 cv2.imwrite('debug/acc/{}-acc_image.png'.format(i),a*255)
-                p = a*p*0.5+(1-a)*p*2
+                p = a*p*1/1.1+(1-a)*p*1.1
                 p_image = p
                 p_image = p_image - p_image.min()
                 p_image = p_image / p_image.max()
