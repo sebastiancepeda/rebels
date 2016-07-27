@@ -23,6 +23,8 @@ alpha                = 1 # in [0.01,100]
 beta                  = 0.1
 gamma              = 10
 
+it_counter = 0
+
 def load_data():
     features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
     #features 	   = Image.open('../DRIVE/21a.gif','r')
@@ -91,6 +93,9 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
 
 # ############################## Main program ################################
 def main(model='mlp', num_epochs=500):
+    print('deleting images... ')###########################################
+    for f in glob.glob("debug/*/*.png"):
+        os.remove(f)
     print("Loading data...")
     X_train, y_train, X_val, y_val, X_test, y_test = load_data()
     input_var = T.dtensor4('inputs')
@@ -183,21 +188,31 @@ def main(model='mlp', num_epochs=500):
             p_data = 1
         return grad_giver(x, t, p_data)
         
-    def callback(all_w):
-        # And a full pass over the validation data:
-        val_err = 0
-        val_acc = 0
-        val_batches = 0
-        for batch in iterate_minibatches(X_val, y_val, nbatch, shuffle=False):
-            inputs, targets = batch
-            err, acc = val_fn(inputs, targets)
-            val_err += err
-            val_acc += acc
-            val_batches += 1
-        
-        # Then we print the results for this epoch:
-        print("  validation loss:\t\t{:.6f}".format(val_err / val_batches))
-        print("  validation accuracy:\t\t{:.2f} %".format(val_acc / val_batches * 100))
+    def callback(w_t):
+        global it_counter
+        args = (X_train,  y_train)
+        e_t = func(w_t , *args)
+        print('save target image... ')##########################################
+        targ = numpy.pad(numpy.reshape(y_train,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        t_image = numpy.floor(targ)
+        cv2.imwrite('debug/0-t_image.png',t_image*255)
+        print('save test image... ')
+        y_out = output_model(X_train)
+        y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        y_out = y_out[:,:,1:3]
+        output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
+        img = numpy.floor(output_image*255)
+        cv2.imwrite('debug/y_out/{}-image.png'.format(it_counter),img)
+        print('save error image... ')
+        e_preds = y_out[:, :, 1] - targ
+        e_img = e_preds*e_preds
+        e_img = numpy.floor(e_img*255)
+        cv2.imwrite('debug/error/{}-error_image.png'.format(it_counter),e_img*255)
+        print('save acc image... ')
+        a = output_image*targ+(1-output_image)*(1-targ)
+        cv2.imwrite('debug/acc/{}-acc_image.png'.format(it_counter),a*255)
+        it_counter += 1
+    
     '''
     Method that performs a plot of the error surface with respect to lamda
     '''
@@ -236,39 +251,38 @@ def main(model='mlp', num_epochs=500):
         p = numpy.zeros((PatternShape[0],PatternShape[1]))+1/(ImageShape[0]*ImageShape[1])
         args = sampleData(training_data,  p)
         e_t = func(w_t , *args)
-        print('deleting images... ')###########################################
-        for f in glob.glob("debug/*/*.png"):
-            os.remove(f)
         print('save input image... ')###########################################
-        idx_x = X_val.shape[1]//2
-        idx_y = X_val.shape[2]//2
-        idx_z = X_val.shape[3]//2
-        x_out = X_val[:, idx_x, idx_y, idx_z]
+        idx_x = X_train.shape[1]//2
+        idx_y = X_train.shape[2]//2
+        idx_z = X_train.shape[3]//2
+        x_out = X_train[:, idx_x, idx_y, idx_z]
         x_image = numpy.pad(numpy.reshape(x_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         x_image = numpy.floor(x_image)
         cv2.imwrite('debug/0-x_image.png',x_image)
         print('save target image... ')##########################################
-        targ = numpy.pad(numpy.reshape(y_val,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+        targ = numpy.pad(numpy.reshape(y_train,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         t_image = numpy.floor(targ)
         cv2.imwrite('debug/0-t_image.png',t_image*255)
         for i in numpy.arange(num_epochs):            
-            dedw = fprime(w_t , *args)
-            g_t = dedw/(numpy.abs(dedw).max())
+            #dedw = fprime(w_t , *args)
+            #g_t = dedw/(numpy.abs(dedw).max())
             #g_t = dedw
-            m_t = 0.9*m_t + g_t*0.0001
-            #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
-            lamda_t = 0.9
-            w_t  = w_t + m_t*lamda_t
-            e_t = func(w_t , *args)
+            #m_t = 0.9*m_t + g_t*0.0001
+            ##lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
+            #lamda_t = 0.9
+            #w_t  = w_t + m_t*lamda_t
+            #e_t = func(w_t , *args)
+            result = scipy.optimize.fmin_l_bfgs_b(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=None)
+            w_t = result[0]
             print('e_t[1].shape: {}'.format(e_t[1].shape))
             print('error_T image... ')
             #error_T = numpy.pad(numpy.reshape(e_t[1],(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
             #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
             args = sampleData(training_data, p)
-            print("lamda_t: {}".format(lamda_t))
-            print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
-            print("i: {}, e_t: {}".format(i, e_t[0]))
-            print("error: {}".format(e_t[1].mean()))
+            #print("lamda_t: {}".format(lamda_t))
+            #print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
+            #print("i: {}, e_t: {}".format(i, e_t[0]))
+            #print("error: {}".format(e_t[1].mean()))
             print("-----------------------------------------------------------")
             #if(numpy.abs(g_t).mean() < 1/1000000):
             #    break
@@ -280,7 +294,7 @@ def main(model='mlp', num_epochs=500):
                 im_data = numpy.pad(numpy.reshape(data_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 cv2.imwrite('debug/data/{}-image.png'.format(i),im_data*255)
                 print('save test image... ')
-                y_out = output_model(X_val)
+                y_out = output_model(X_train)
                 y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 y_out = y_out[:,:,1:3]
                 output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
@@ -300,8 +314,8 @@ def main(model='mlp', num_epochs=500):
                 p_image = p_image / p_image.max()
                 cv2.imwrite('debug/p/{}-p_image.png'.format(i),numpy.floor(p_image*255))
     
-    #optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
-    scipy.optimize.fmin_l_bfgs_b(func, x0=params_giver(), fprime=fprime, args=(X_train, y_train), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=None, callback=callback)
+    optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
+    #scipy.optimize.fmin_l_bfgs_b(func, x0=params_giver(), fprime=fprime, args=(X_train, y_train), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=callback)
     
     print('Show test image... ')
     y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
