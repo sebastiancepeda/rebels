@@ -207,7 +207,7 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 100):
+    def sampleData(training_data,  p_total,  n_samples = 10000):
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.sum())
@@ -251,10 +251,10 @@ def main(model='mlp', num_epochs=500):
             dedw = fprime(w_t , *args)
             g_t = dedw/(numpy.abs(dedw).max())
             #g_t = dedw
-            m_t = 0.0*m_t + g_t*0.00001
+            m_t = 0.9*m_t + g_t*0.0001
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
             lamda_t = 0.9
-            w_t  = w_t - m_t*lamda_t
+            w_t  = w_t + m_t*lamda_t
             e_t = func(w_t , *args)
             print('e_t[1].shape: {}'.format(e_t[1].shape))
             print('error_T image... ')
@@ -297,6 +297,7 @@ def main(model='mlp', num_epochs=500):
                 cv2.imwrite('debug/p/{}-p_image.png'.format(i),numpy.floor(p_image*255))
     
     optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
+    
     
     print('Show test image... ')
     y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
