@@ -164,7 +164,8 @@ def main(model='mlp', num_epochs=500):
     def func(params, *args):
         x = args[0]
         t = args[1]
-        p_data = args[2]
+        if(len(args) >= 3):
+            p_data = args[2]
         params_updater(params)
         return train_fn(x,  t)
     
@@ -176,7 +177,10 @@ def main(model='mlp', num_epochs=500):
     def fprime(params, *args):
         x = args[0]
         t = args[1]
-        p_data = args[2]
+        if(len(args) >= 3):
+            p_data = args[2]
+        else:
+            p_data = 1
         return grad_giver(x, t, p_data)
         
     def callback(all_w):
@@ -296,8 +300,8 @@ def main(model='mlp', num_epochs=500):
                 p_image = p_image / p_image.max()
                 cv2.imwrite('debug/p/{}-p_image.png'.format(i),numpy.floor(p_image*255))
     
-    optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
-    
+    #optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
+    scipy.optimize.fmin_l_bfgs_b(func, x0=params_giver(), fprime=fprime, args=(X_train, y_train), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=None, callback=callback)
     
     print('Show test image... ')
     y_preds   = [output_model(inputs) for inputs, targets in iterate_minibatches(X_val, y_val, 1, shuffle=False)]
