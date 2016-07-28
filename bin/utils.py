@@ -65,7 +65,7 @@ def sliding_window(image, stepSize, w, dim,output):
                 value[c,] = sample
             c += 1
             mean_sample += sample/c
-    return value - mean_sample
+    return value# - mean_sample
 
 def sliding_window2(image, stepSize, w, dim):
     n1 = image.shape[0]

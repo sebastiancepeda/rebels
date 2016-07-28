@@ -127,6 +127,13 @@ def main(model='mlp', num_epochs=500):
     train_fn = theano.function([input_var, target_var], [loss,  error])
     val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
     output_model = theano.function([input_var], prediction)
+    # grads
+    grads = []
+    for w in params:
+        grad = T.grad(loss,  w)
+        grad_fn = theano.function([input_var, target_var], grad)
+        grads = grads + [grad_fn]
+    
     def params_giver():
         ws = []
         for w in params:
@@ -137,9 +144,7 @@ def main(model='mlp', num_epochs=500):
     
     def grad_giver(x,  t,  p_data):
         gs = []
-        for w in params:
-            grad = T.grad(loss,  w)
-            grad_fn = theano.function([input_var, target_var], grad)
+        for grad_fn in grads:
             gs = numpy.append(gs,  grad_fn(x,  t))
         return gs
     '''
@@ -147,6 +152,8 @@ def main(model='mlp', num_epochs=500):
     and inserts them in the net. 
     '''
     def params_updater(all_w):
+        #a=[params[0].get_value(),params[1].get_value(),params[2].get_value(),params[3].get_value()]
+        #all_w += 0.1
         idx_init = 0
         for w in params:
             w_in = T.dmatrix()
@@ -158,6 +165,7 @@ def main(model='mlp', num_epochs=500):
             w_value = w_act.reshape(w_value_pre.shape)
             idx_init += w_value_pre.size
             w_update(w_value)
+        #b=[params[0].get_value(),params[1].get_value(),params[2].get_value(),params[3].get_value()]
         return
     
     '''
