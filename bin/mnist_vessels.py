@@ -15,7 +15,7 @@ import cv2
 import glob, os
 import utils
 
-ImageShape      = (584,565,3)
+ImageShape      = (584,565,1)
 PatternShape    = (584,565)
 winSize             = (3, 3)
 nbatch              = 100
@@ -26,8 +26,8 @@ gamma              = 10
 it_counter = 0
 
 def load_data():
-    features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
-    #features 	   = Image.open('../DRIVE/21a.gif','r')
+    #features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
+    features 	   = Image.open('../DRIVE/21a.gif','r')
     #features 	   = Image.open('../DRIVE/21d.bmp','r')
     #features 	 = Image.open('../DRIVE/AddBorder21.png','r')
     #features 	 = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
@@ -172,7 +172,7 @@ def main(model='mlp', num_epochs=500):
         if(len(args) >= 3):
             p_data = args[2]
         params_updater(params)
-        return train_fn(x,  t)
+        return train_fn(x,  t)[0]
     
     '''
     Method that receives the weights (params), training data (args)
@@ -186,6 +186,7 @@ def main(model='mlp', num_epochs=500):
             p_data = args[2]
         else:
             p_data = 1
+        params_updater(params)
         return grad_giver(x, t, p_data)
         
     def callback(w_t):
@@ -226,7 +227,7 @@ def main(model='mlp', num_epochs=500):
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 10000):
+    def sampleData(training_data,  p_total,  n_samples = 1000):
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.sum())
@@ -273,8 +274,10 @@ def main(model='mlp', num_epochs=500):
             #w_t  = w_t + m_t*lamda_t
             #e_t = func(w_t , *args)
             result = scipy.optimize.fmin_l_bfgs_b(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=None)
+            #result = scipy.optimize.fmin_ncg(func, x0=w_t, fprime=fprime, fhess_p=None, fhess=None, args=(args[0], args[1]), avextol=1e-05, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
+            #result = scipy.optimize.fmin_cg(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), gtol=1e-05, norm=1e8, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
             w_t = result[0]
-            print('e_t[1].shape: {}'.format(e_t[1].shape))
+            #print('e_t[1].shape: {}'.format(e_t[1].shape))
             print('error_T image... ')
             #error_T = numpy.pad(numpy.reshape(e_t[1],(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
             #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
