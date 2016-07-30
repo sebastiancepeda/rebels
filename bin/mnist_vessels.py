@@ -15,9 +15,9 @@ import cv2
 import glob, os
 import utils
 
-ImageShape      = (584,565,1)
+ImageShape      = (584,565,3)
 PatternShape    = (584,565)
-winSize             = (3, 3)
+winSize             = (9, 9)
 nbatch              = 100
 alpha                = 1 # in [0.01,100]
 beta                  = 0.1
@@ -26,8 +26,8 @@ gamma              = 10
 it_counter = 0
 
 def load_data():
-    #features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
-    features 	   = Image.open('../DRIVE/21a.gif','r')
+    features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
+    #features 	   = Image.open('../DRIVE/21a.gif','r')
     #features 	   = Image.open('../DRIVE/21d.bmp','r')
     #features 	 = Image.open('../DRIVE/AddBorder21.png','r')
     #features 	 = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
@@ -99,7 +99,7 @@ def main(model='mlp', num_epochs=500):
     print("Loading data...")
     X_train, y_train, X_val, y_val, X_test, y_test = load_data()
     input_var = T.dtensor4('inputs')
-    target_var = T.dvector('targets')
+    target_var = T.ivector('targets')
     p = T.dvector('p')
     print("Building model and compiling functions...")
     if model.startswith('custom_mlp:'):
@@ -109,9 +109,9 @@ def main(model='mlp', num_epochs=500):
         print("Unrecognized model type %r." % model)
         return
     prediction = lasagne.layers.get_output(network)
-    error = prediction[:, 1] + target_var
-    error = (error*error)
-    loss = error.mean()
+    t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
+    error = lasagne.objectives.categorical_crossentropy(prediction, t2)
+    loss = error.mean()/100/(winSize[0]*winSize[1])
     params = lasagne.layers.get_all_params(network, trainable=True)
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
     test_loss = ((test_prediction[:, 1]-target_var)*(test_prediction[:, 1]-target_var)).mean()
@@ -124,7 +124,7 @@ def main(model='mlp', num_epochs=500):
     thresholded_prediction = T.dot(test_prediction,a)
     thresholded_prediction = T.argmax(test_prediction, axis=1)
     test_acc = T.mean(T.eq(thresholded_prediction, target_var),dtype=theano.config.floatX)
-    train_fn = theano.function([input_var, target_var], [loss,  error])
+    train_fn = theano.function([input_var, target_var], [loss])
     val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
     output_model = theano.function([input_var], prediction)
     # grads
@@ -229,13 +229,13 @@ def main(model='mlp', num_epochs=500):
         phi = numpy.linspace(start, end, points)
         e_phi = numpy.linspace(0, 0, points)
         for k in numpy.arange(phi.size):
-            e_phi[k] = func(w_t - phi[k]*g, *args)[0]
+            e_phi[k] = func(w_t - phi[k]*g, *args)
         if(debug >= 1):
             plt.plot(phi, e_phi)
             plt.show()
         return phi[numpy.argmin(e_phi)]
         
-    def sampleData(training_data,  p_total,  n_samples = 1000):
+    def sampleData(training_data,  p_total,  n_samples = 10000):
         p_examples = utils.sliding_window2(p_total, stepSize=1, w=winSize, dim=1)
         p_examples = numpy.asarray(numpy.squeeze(numpy.asarray(p_examples)),dtype=theano.config.floatX).astype(numpy.float64)
         p_examples = p_examples/(1/1000000+p_examples.sum())
@@ -258,7 +258,8 @@ def main(model='mlp', num_epochs=500):
         w_t = x0
         m_t = 0
         p = numpy.zeros((PatternShape[0],PatternShape[1]))+1/(ImageShape[0]*ImageShape[1])
-        args = sampleData(training_data,  p)
+        n_samples = numpy.floor(0.99*PatternShape[0]*PatternShape[1])
+        args = sampleData(training_data,  p,  n_samples)
         e_t = func(w_t , *args)
         print('save input image... ')###########################################
         idx_x = X_train.shape[1]//2
@@ -273,31 +274,31 @@ def main(model='mlp', num_epochs=500):
         t_image = numpy.floor(targ)
         cv2.imwrite('debug/0-t_image.png',t_image*255)
         for i in numpy.arange(num_epochs):            
-            #dedw = fprime(w_t , *args)
-            #g_t = dedw/(numpy.abs(dedw).max())
-            #g_t = dedw
-            #m_t = 0.9*m_t + g_t*0.0001
-            ##lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=0)
-            #lamda_t = 0.9
-            #w_t  = w_t + m_t*lamda_t
-            #e_t = func(w_t , *args)
-            result = scipy.optimize.fmin_l_bfgs_b(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=None)
+            dedw = fprime(w_t , *args)
+            g_t = dedw#/(numpy.abs(dedw).max())
+            m_t = 0.9*m_t + g_t*0.001
+            #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=1)
+            lamda_t = 1
+            w_t  = w_t - g_t*lamda_t
+            e_t = func(w_t , *args)
+            #result = scipy.optimize.fmin_l_bfgs_b(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=None)
             #result = scipy.optimize.fmin_ncg(func, x0=w_t, fprime=fprime, fhess_p=None, fhess=None, args=(args[0], args[1]), avextol=1e-05, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
             #result = scipy.optimize.fmin_cg(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), gtol=1e-05, norm=1e8, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
-            w_t = result[0]
+            #w_t = result[0]
             #print('e_t[1].shape: {}'.format(e_t[1].shape))
-            print('error_T image... ')
+            #print('error_T image... ')
             #error_T = numpy.pad(numpy.reshape(e_t[1],(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
             #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
-            args = sampleData(training_data, p)
-            #print("lamda_t: {}".format(lamda_t))
-            #print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
-            #print("i: {}, e_t: {}".format(i, e_t[0]))
+            n_samples = numpy.floor(0.999*n_samples)
+            args = sampleData(training_data, p, n_samples)
+            print("lamda_t: {}".format(lamda_t))
+            print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
+            print("i: {}, e_t: {}".format(i, e_t))
             #print("error: {}".format(e_t[1].mean()))
             print("-----------------------------------------------------------")
             #if(numpy.abs(g_t).mean() < 1/1000000):
             #    break
-            if(i % 1 == 0):
+            if(i % 10 == 0):
                 #callback(w_t)
                 print('save data image... ')
                 data_out = args[3]
@@ -306,10 +307,12 @@ def main(model='mlp', num_epochs=500):
                 cv2.imwrite('debug/data/{}-image.png'.format(i),im_data*255)
                 print('save test image... ')
                 y_out = output_model(X_train)
+                acc_out = numpy.argmax(y_out,axis=1)
                 y_out = numpy.pad(numpy.reshape(y_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1, 2),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
+                acc_out = numpy.pad(numpy.reshape(acc_out,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
                 y_out = y_out[:,:,1:3]
                 output_image = (y_out[:, :, 0] < y_out[:, :, 1]*alpha)*1
-                img = numpy.floor(output_image*255)
+                img = numpy.floor(acc_out*255)
                 cv2.imwrite('debug/y_out/{}-image.png'.format(i),img)
                 print('save error image... ')
                 e_preds = y_out[:, :, 1] - targ
@@ -325,7 +328,7 @@ def main(model='mlp', num_epochs=500):
                 p_image = p_image / p_image.max()
                 cv2.imwrite('debug/p/{}-p_image.png'.format(i),numpy.floor(p_image*255))
     
-    optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train),  callback=callback)
+    optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train.astype(numpy.int32)),  callback=callback)
     #scipy.optimize.fmin_l_bfgs_b(func, x0=params_giver(), fprime=fprime, args=(X_train, y_train), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=callback)
     
     print('Show test image... ')
@@ -346,7 +349,7 @@ def main(model='mlp', num_epochs=500):
     test_batches = 0
     for batch in iterate_minibatches(X_test, y_test, nbatch, shuffle=False):
         inputs, targets = batch
-        err, acc = val_fn(inputs, targets)
+        err, acc = val_fn(inputs, targets.astype(numpy.int32))
         test_err += err
         test_acc += acc
         test_batches += 1
