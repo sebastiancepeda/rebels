@@ -17,7 +17,7 @@ import utils
 
 ImageShape      = (584,565,3)
 PatternShape    = (584,565)
-winSize             = (9, 9)
+winSize             = (7, 7)
 nbatch              = 100
 alpha                = 1 # in [0.01,100]
 beta                  = 0.1
@@ -259,6 +259,7 @@ def main(model='mlp', num_epochs=500):
         m_t = 0
         p = numpy.zeros((PatternShape[0],PatternShape[1]))+1/(ImageShape[0]*ImageShape[1])
         n_samples = numpy.floor(0.99*PatternShape[0]*PatternShape[1])
+        #n_samples = numpy.floor(PatternShape[0]*PatternShape[1])
         args = sampleData(training_data,  p,  n_samples)
         e_t = func(w_t , *args)
         print('save input image... ')###########################################
@@ -276,7 +277,7 @@ def main(model='mlp', num_epochs=500):
         for i in numpy.arange(num_epochs):            
             dedw = fprime(w_t , *args)
             g_t = dedw#/(numpy.abs(dedw).max())
-            m_t = 0.9*m_t + g_t*0.001
+            m_t = 0.99*m_t + g_t*0.001
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=1)
             lamda_t = 1
             w_t  = w_t - g_t*lamda_t
