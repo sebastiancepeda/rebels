@@ -69,7 +69,7 @@ def build_custom_mlp(input_var=None, depth=2, width=800, drop_input=.2, drop_hid
     if drop_input:
         network = lasagne.layers.dropout(network, p=drop_input)
     # Hidden layers and dropout:
-    nonlin = lasagne.nonlinearities.leaky_rectify
+    nonlin = lasagne.nonlinearities.very_leaky_rectify
     for _ in range(depth):
         network = lasagne.layers.DenseLayer(network, width, nonlinearity=nonlin)
         if drop_hidden:
@@ -111,7 +111,7 @@ def main(model='mlp', num_epochs=500):
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
-    loss = error.mean()/100/(winSize[0]*winSize[1])
+    loss = error.mean()/100/(winSize[0]*winSize[1]) + lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)*0.000001
     params = lasagne.layers.get_all_params(network, trainable=True)
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
     test_loss = ((test_prediction[:, 1]-target_var)*(test_prediction[:, 1]-target_var)).mean()
@@ -258,7 +258,7 @@ def main(model='mlp', num_epochs=500):
         w_t = x0
         m_t = 0
         p = numpy.zeros((PatternShape[0],PatternShape[1]))+1/(ImageShape[0]*ImageShape[1])
-        n_samples = numpy.floor(0.99*PatternShape[0]*PatternShape[1])
+        n_samples = numpy.floor(0.5*PatternShape[0]*PatternShape[1])
         #n_samples = numpy.floor(PatternShape[0]*PatternShape[1])
         args = sampleData(training_data,  p,  n_samples)
         e_t = func(w_t , *args)
@@ -274,14 +274,18 @@ def main(model='mlp', num_epochs=500):
         targ = numpy.pad(numpy.reshape(y_train,(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
         t_image = numpy.floor(targ)
         cv2.imwrite('debug/0-t_image.png',t_image*255)
-        for i in numpy.arange(num_epochs):            
+        e_it = numpy.zeros(num_epochs)
+        de_it = numpy.zeros(num_epochs)
+        for i in numpy.arange(num_epochs):
             dedw = fprime(w_t , *args)
             g_t = dedw#/(numpy.abs(dedw).max())
-            m_t = 0.99*m_t + g_t*0.001
+            m_t = 0.99*m_t + g_t*0.01
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=1)
             lamda_t = 1
             w_t  = w_t - g_t*lamda_t
             e_t = func(w_t , *args)
+            e_it[i] = e_t
+            de_it[i] = numpy.abs(dedw).mean()
             #result = scipy.optimize.fmin_l_bfgs_b(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), approx_grad=0, bounds=None, m=10, factr=10000000.0, pgtol=1e-05, epsilon=1e-08, iprint=0, maxfun=15000, maxiter=15000, disp=1, callback=None)
             #result = scipy.optimize.fmin_ncg(func, x0=w_t, fprime=fprime, fhess_p=None, fhess=None, args=(args[0], args[1]), avextol=1e-05, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
             #result = scipy.optimize.fmin_cg(func, x0=w_t, fprime=fprime, args=(args[0], args[1]), gtol=1e-05, norm=1e8, epsilon=1.4901161193847656e-08, maxiter=None, full_output=1, disp=1, retall=1, callback=None)
@@ -290,7 +294,7 @@ def main(model='mlp', num_epochs=500):
             #print('error_T image... ')
             #error_T = numpy.pad(numpy.reshape(e_t[1],(PatternShape[0]-winSize[0]+1,PatternShape[1]-winSize[1]+1),'A'), (winSize[0]//2, winSize[1]//2), 'constant')
             #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
-            n_samples = numpy.floor(0.999*n_samples)
+            #n_samples = numpy.floor(0.999*n_samples)
             args = sampleData(training_data, p, n_samples)
             print("lamda_t: {}".format(lamda_t))
             print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
@@ -301,6 +305,10 @@ def main(model='mlp', num_epochs=500):
             #    break
             if(i % 10 == 0):
                 #callback(w_t)
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                ax.plot(numpy.arange(i), e_it[0:i])
+                fig.savefig('debug/error.png')
+                plt.close(fig) 
                 print('save data image... ')
                 data_out = args[3]
                 print('data_out.shape: {}'.format(data_out.shape))
