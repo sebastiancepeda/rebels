@@ -17,7 +17,7 @@ import utils
 
 ImageShape      = (584,565,3)
 PatternShape    = (584,565)
-winSize             = (7, 7)
+winSize             = (21,21)
 nbatch              = 100
 alpha                = 1 # in [0.01,100]
 beta                  = 0.1
@@ -180,7 +180,7 @@ def main(model='mlp', num_epochs=500):
         if(len(args) >= 3):
             p_data = args[2]
         params_updater(params)
-        return train_fn(x,  t)[0]
+        return train_fn(x,  t.astype(numpy.int32))[0]
     
     '''
     Method that receives the weights (params), training data (args)
@@ -195,7 +195,7 @@ def main(model='mlp', num_epochs=500):
         else:
             p_data = 1
         params_updater(params)
-        return grad_giver(x, t, p_data)
+        return grad_giver(x, t.astype(numpy.int32), p_data)
         
     def callback(w_t):
         global it_counter
@@ -258,7 +258,7 @@ def main(model='mlp', num_epochs=500):
         w_t = x0
         m_t = 0
         p = numpy.zeros((PatternShape[0],PatternShape[1]))+1/(ImageShape[0]*ImageShape[1])
-        n_samples = numpy.floor(0.5*PatternShape[0]*PatternShape[1])
+        n_samples = numpy.floor(0.1*PatternShape[0]*PatternShape[1])
         #n_samples = numpy.floor(PatternShape[0]*PatternShape[1])
         args = sampleData(training_data,  p,  n_samples)
         e_t = func(w_t , *args)
@@ -279,10 +279,10 @@ def main(model='mlp', num_epochs=500):
         for i in numpy.arange(num_epochs):
             dedw = fprime(w_t , *args)
             g_t = dedw#/(numpy.abs(dedw).max())
-            m_t = 0.99*m_t + g_t*0.01
+            m_t = 0.90*m_t - g_t*0.01
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=1)
             lamda_t = 1
-            w_t  = w_t - g_t*lamda_t
+            w_t  = w_t + m_t
             e_t = func(w_t , *args)
             e_it[i] = e_t
             de_it[i] = numpy.abs(dedw).mean()
@@ -331,7 +331,7 @@ def main(model='mlp', num_epochs=500):
                 print('save acc image... ')
                 a = output_image*targ+(1-output_image)*(1-targ)
                 cv2.imwrite('debug/acc/{}-acc_image.png'.format(i),a*255)
-                p = a*p*1/1.1+(1-a)*p*1.1
+                p = a*p*1/1.0001+(1-a)*p*1.0001 # Distribucion de probabilidad de eleccion de ejemplos (p). En los puntos correctos, se disminuye la probabilidad, sino aumenta. 
                 p_image = p
                 p_image = p_image - p_image.min()
                 p_image = p_image / p_image.max()
