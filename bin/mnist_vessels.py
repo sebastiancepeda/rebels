@@ -17,7 +17,7 @@ import utils
 
 ImageShape      = (584,565,3)
 PatternShape    = (584,565)
-winSize             = (21,21)
+winSize             = (3,3)
 nbatch              = 100
 alpha                = 1 # in [0.01,100]
 beta                  = 0.1
@@ -26,17 +26,11 @@ gamma              = 10
 it_counter = 0
 
 def load_data():
-    features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')
-    #features 	   = Image.open('../DRIVE/21a.gif','r')
-    #features 	   = Image.open('../DRIVE/21d.bmp','r')
-    #features 	 = Image.open('../DRIVE/AddBorder21.png','r')
-    #features 	 = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
-    
+    features 	   = Image.open('../DRIVE/training/images/21_training.tif','r')    
     features     = numpy.fromstring(features.tostring(), dtype='uint8', count=-1, sep='')
     features     = numpy.reshape(features,ImageShape,'A')
     
     image2     = Image.open('../DRIVE/training/1st_manual/21_manual1.gif','r')
-    #image2     = Image.open('../DRIVE/training/mask/21_training_mask.gif','r')
     image2     = numpy.fromstring(image2.tostring(), dtype='uint8', count=-1, sep='')
     image2     = numpy.reshape(image2,PatternShape,'A')
     
@@ -46,13 +40,7 @@ def load_data():
     
     train_set_t  = utils.sliding_window(image2, stepSize=1, w=winSize, dim=1,output=1)
     valid_set_t  = train_set_t
-    test_set_t   = train_set_t
-    
-    #train_set,  train_set_t = balance(train_set,  train_set_t)
-    
-    print('train_set_t.mean()')
-    print(train_set_t.mean())
-    
+    test_set_t   = train_set_t    
     def shared_dataset(data_x, data_y, borrow=True):
         shared_x = numpy.asarray(data_x,dtype=theano.config.floatX)
         shared_y = numpy.asarray(numpy.squeeze(numpy.asarray(data_y)),dtype=theano.config.floatX)
@@ -111,7 +99,7 @@ def main(model='mlp', num_epochs=500):
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
-    loss = error.mean()/100/(winSize[0]*winSize[1]) + lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)*0.000001
+    loss = error.mean()/100/(winSize[0]*winSize[1])# + lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)*0.0000000001
     params = lasagne.layers.get_all_params(network, trainable=True)
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
     test_loss = ((test_prediction[:, 1]-target_var)*(test_prediction[:, 1]-target_var)).mean()
@@ -247,9 +235,9 @@ def main(model='mlp', num_epochs=500):
         x_out = x[inds[0:n_samples],:,:,:]
         y_out = y[inds[0:n_samples]]
         data_out[inds[0:n_samples]] = 1
-        print("x_out.shape: {}".format(x_out.shape))
-        print("y_out.shape: {}".format(y_out.shape))
-        print('data_out.sum(): {}'.format(data_out.sum()))
+        #print("x_out.shape: {}".format(x_out.shape))
+        #print("y_out.shape: {}".format(y_out.shape))
+        #print('data_out.sum(): {}'.format(data_out.sum()))
         return (x_out, y_out, p_dummy,  data_out)
         #return (x, y, p_dummy,  data_out)
     
@@ -276,13 +264,13 @@ def main(model='mlp', num_epochs=500):
         cv2.imwrite('debug/0-t_image.png',t_image*255)
         e_it = numpy.zeros(num_epochs)
         de_it = numpy.zeros(num_epochs)
+        #g2_t = 0.000000001
         for i in numpy.arange(num_epochs):
             dedw = fprime(w_t , *args)
-            g_t = dedw#/(numpy.abs(dedw).max())
-            m_t = 0.90*m_t - g_t*0.01
+            g_t = -dedw#/(numpy.abs(dedw).max())
+            m_t = 0.97*m_t + g_t*0.1
+            w_t  = w_t + 0.97*m_t + g_t*0.1
             #lamda_t = ghaph(args,  w_t,  g_t, -1, 1, 10,  debug=1)
-            lamda_t = 1
-            w_t  = w_t + m_t
             e_t = func(w_t , *args)
             e_it[i] = e_t
             de_it[i] = numpy.abs(dedw).mean()
@@ -296,8 +284,8 @@ def main(model='mlp', num_epochs=500):
             #cv2.imwrite('debug/error_t/{}-image.png'.format(i),error_T*255)
             #n_samples = numpy.floor(0.999*n_samples)
             args = sampleData(training_data, p, n_samples)
-            print("lamda_t: {}".format(lamda_t))
-            print("numpy.abs(g_t).mean(): {}".format(numpy.abs(g_t).mean()))
+            #print("lamda_t: {}".format(lamda_t))
+            print("numpy.abs(delta).mean(): {}".format(numpy.abs(delta).mean()))
             print("i: {}, e_t: {}".format(i, e_t))
             #print("error: {}".format(e_t[1].mean()))
             print("-----------------------------------------------------------")

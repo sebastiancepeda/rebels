@@ -65,7 +65,7 @@ def sliding_window(image, stepSize, w, dim,output):
                 value[c,] = sample
             c += 1
             mean_sample += sample/c
-    return value# - mean_sample
+    return value
 
 def sliding_window2(image, stepSize, w, dim):
     n1 = image.shape[0]
@@ -88,7 +88,7 @@ def reconstruct_image(y_preds,w, PatternShape, alpha):
     output_image = numpy.zeros((PatternShape[0],PatternShape[1]))
     for x in xrange(w[0]//2, PatternShape[0]-w[0]//2, 1):
         for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
-            if(y_preds[a][0][0] > y_preds[a][0][1]*alpha):
+            if(y_preds[a][0] > y_preds[a][1]*alpha):
                 output_image[x][y] = 0
             else:
                 output_image[x][y] = 1
