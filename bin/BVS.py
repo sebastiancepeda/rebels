@@ -64,7 +64,7 @@ def main():
         depth = int(config["layers"])
         width = int(config["neurons_by_layer"])
         drop_in = float(config["dropout_input"])
-        drop_hid = float(config["layers"])
+        drop_hid = float(config["dropout_hidden"])
         num_epochs = int(config["num_epochs"])    
         winSide = int(config["window_side"])    
         ImageShape = config["image_shape"]
