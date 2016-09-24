@@ -26,9 +26,9 @@ def load_data(ImageShape, PatternShape, winSize, n_image = 21):
     mask  = sliding_window(mask_image, stepSize=1, w=winSize, dim=1,output=1)
     mask = mask[:,0]
     print('Scaling data. ')
-    #x = preprocessing.scale(x)
-    min_max_scaler = preprocessing.MinMaxScaler()
-    x = min_max_scaler.fit_transform(x)
+    x = preprocessing.scale(x)
+    #min_max_scaler = preprocessing.MinMaxScaler()
+    #x = min_max_scaler.fit_transform(x)
     return x, t,  mask
 
 '''
