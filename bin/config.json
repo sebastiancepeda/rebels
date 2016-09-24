@@ -4,7 +4,7 @@
 "dropout_input":"0.0",
 "dropout_hidden":"0.0",
 "num_epochs":"10000",
-"window_side":"25",
+"window_side":"21",
 "alpha":"1.0",
 "image_shape":["584","565","3"]
 }
