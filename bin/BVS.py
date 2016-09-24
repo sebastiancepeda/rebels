@@ -21,16 +21,9 @@ import datetime
 from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 import utils
+import json
 ###############################
-print('Start! ')
-it_counter = 0
-ImageShape     = (584,565,3)
-PatternShape   = (584,565)
-winSize            = (15, 15)
-n_features       = 3*winSize[0]*winSize[1]
-alpha               = 1
-###############################
-def load_data(n_image = 21):
+def load_data(ImageShape, PatternShape, winSize, n_image = 21):
     print('Reading data. ')
     features 	   = Image.open('../DRIVE/training/images/'+str(n_image)+'_training.tif','r')    
     features     = numpy.fromstring(features.tobytes(), dtype='uint8', count=-1, sep='')
@@ -46,7 +39,7 @@ def load_data(n_image = 21):
     train_set = preprocessing.scale(train_set)
     return train_set, train_set_t
 
-def build_custom_mlp(input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
+def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
     network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
     if drop_input:
         network = lasagne.layers.dropout(network, p=drop_input)
@@ -62,42 +55,39 @@ def build_custom_mlp(input_var=None, depth=2, width=800, drop_input=.2, drop_hid
     network = lasagne.layers.DenseLayer(network, 2, nonlinearity=last_nonlin)
     return network
 
-def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
-    assert len(inputs) == len(targets)
-    if shuffle:
-        indices = np.arange(len(inputs))
-        np.random.shuffle(indices)
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        if shuffle:
-            excerpt = indices[start_idx:start_idx + batchsize]
-        else:
-            excerpt = slice(start_idx, start_idx + batchsize)
-        yield inputs[excerpt], targets[excerpt]
-
 # ############################## Main program ################################
-def main(model='mlp', num_epochs=500):
-    X_train, y_train = load_data()
+def main():
+    print('* Start! ')
+    print('* Loading config.json')
+    with open('config.json') as json_data:
+        config = json.load(json_data)
+        depth = int(config["layers"])
+        width = int(config["neurons_by_layer"])
+        drop_in = float(config["dropout_input"])
+        drop_hid = float(config["layers"])
+        num_epochs = int(config["num_epochs"])    
+        winSide = int(config["window_side"])    
+        ImageShape = config["image_shape"]
+        ImageShape = (int(ImageShape[0]),int(ImageShape[1]),int(ImageShape[2]))
+        alpha = float(config["alpha"])
+    # Other global variables
+    PatternShape   	= (ImageShape[0],ImageShape[1])
+    winSize        	    = (winSide,winSide)
+    n_features     	    = ImageShape[2]*(winSide**2)
+    # Loading dataset
+    X_train, y_train = load_data(ImageShape, PatternShape, winSize)
+    print("* Building model and compiling functions...")
     input_var = T.dmatrix('inputs')
     target_var = T.ivector('targets')
-    p = T.dvector('p')
-    print("Building model and compiling functions...")
-    if model.startswith('custom_mlp:'):
-        depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
-        network = build_custom_mlp(input_var, int(depth), int(width), float(drop_in), float(drop_hid))
-    else:
-        print("Unrecognized model type %r." % model)
-        return
+    network = build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
-    loss = error.mean()/n_features# + lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)*0.0000000001
+    loss = error.mean()/n_features
     params = lasagne.layers.get_all_params(network, trainable=True)
     train_fn = theano.function([input_var, target_var], [loss])
-    test_prediction = lasagne.layers.get_output(network, deterministic=True)
-    test_loss = ((test_prediction[:, 1]-target_var)*(test_prediction[:, 1]-target_var)).mean()
-    test_loss = test_loss.mean()
     output_model = theano.function([input_var], prediction)
-    # grads
+    # grads compilation
     grads = []
     for w in params:
         grad = T.grad(loss,  w)
@@ -170,25 +160,21 @@ def main(model='mlp', num_epochs=500):
         inds = random.sample(range(training_data[0].shape[0]), n_samples)
         x_out = x[inds,:]
         y_out = y[inds]
-        #print('x.shape: {}'.format(x.shape))
         return (x_out, y_out,  0)
         
     def getAUC(w_t,  X_train, y_train):
-        print('w_t.shape: {}'.format(w_t.shape))
         params_updater(w_t)
         m_data = X_train.shape[0]
         output_train = numpy.zeros((m_data, 2))
         points  = numpy.floor(numpy.linspace(0,m_data,m_data/1000)).astype(int)
         for it in numpy.arange(points.size-1):
             output_train[points[it]:points[it+1], :] = output_model(X_train[points[it]:points[it+1], :])
-            #print('it: {}/{}'.format(it, points.size))
         out = output_train[:,1]
         auc = roc_auc_score(y_train, out)
-        print('AUC: {}'.format(auc))
         return auc
     
     def optimizer(func, x0, fprime, training_data, callback):
-        print('Optimizer method. ')
+        print('* Optimizer method. ')
         n_samples = 1000
         w_t = x0
         m_t = 0
@@ -218,10 +204,10 @@ def main(model='mlp', num_epochs=500):
                 args = (train_data[0], train_data[1])
                 print("i: {}, e_t: {}, l_r: {}".format(i, e_t,  l_r))
             de_it[i] = numpy.abs(dw_t).mean()
-            #print("numpy.abs(m_t).mean(): {}".format(numpy.abs(m_t).mean()))
             if((i > 10) and (i % 50 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 auc_it[it2] = getAUC(w_t,  X_train, y_train)
+                print('AUC: {}'.format(auc_it[it2]))
                 auc_x[it2] = i
                 it2 += 1
             if((i > 10) and (i % 50 == 0)):
@@ -246,9 +232,12 @@ def main(model='mlp', num_epochs=500):
     
     optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train.astype(numpy.int32)),  callback=None)
     
-    print('Show test images... ')
+    # Save data
+    sio.savemat('BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
+    
+    print('* Show test images... ')
     for i in numpy.arange(21, 40):
-        X_train, y_train = load_data(i)
+        X_train, y_train = load_data(ImageShape, PatternShape, winSize, i)
         y_preds  = output_model(X_train)
         output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
         aux_image = output_image
@@ -257,18 +246,4 @@ def main(model='mlp', num_epochs=500):
         cv2.imwrite('debug/y_preds-'+str(i)+'.png',img)
 
 if __name__ == '__main__':
-    if ('--help' in sys.argv) or ('-h' in sys.argv):
-        print("Trains a neural network on RedHat using Lasagne.")
-        print("Usage: %s [MODEL [EPOCHS]]" % sys.argv[0])
-        print()
-        print("MODEL: 'custom_mlp:DEPTH,WIDTH,DROP_IN,DROP_HID' for an MLP")
-        print("       with DEPTH hidden layers of WIDTH units, DROP_IN")
-        print("       input dropout and DROP_HID hidden dropout,")
-        print("EPOCHS: number of training epochs to perform (default: 500)")
-    else:
-        kwargs = {}
-        if len(sys.argv) > 1:
-            kwargs['model'] = sys.argv[1]
-        if len(sys.argv) > 2:
-            kwargs['num_epochs'] = int(sys.argv[2])
-        main(**kwargs)
+    main()
