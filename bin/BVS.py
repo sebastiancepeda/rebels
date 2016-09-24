@@ -206,6 +206,7 @@ def main():
             de_it[i] = numpy.abs(dw_t).mean()
             if((i > 10) and (i % 50 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
+                sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 auc_it[it2] = getAUC(w_t,  X_train, y_train)
                 print('AUC: {}'.format(auc_it[it2]))
                 auc_x[it2] = i
@@ -213,15 +214,15 @@ def main():
             if((i > 10) and (i % 50 == 0)):
                 fig, ax = plt.subplots(nrows=1, ncols=1)
                 ax.plot(numpy.arange(i), e_it[0:i], 'r-')
-                fig.savefig('error.png')
+                fig.savefig('debug/error.png')
                 plt.close(fig)
                 fig, ax = plt.subplots(nrows=1, ncols=1)
                 ax.plot(numpy.arange(i), de_it[0:i], 'g-')
-                fig.savefig('dw_t.png')
+                fig.savefig('debug/dw_t.png')
                 plt.close(fig)
                 fig, ax = plt.subplots(nrows=1, ncols=1)
                 ax.plot(auc_x[0:it2], auc_it[0:it2], 'b-')
-                fig.savefig('auc.png')
+                fig.savefig('debug/auc.png')
                 plt.close(fig)
                 print('Show test imge... ')
                 y_preds  = output_model(X_train)
@@ -232,11 +233,8 @@ def main():
     
     optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train.astype(numpy.int32)),  callback=None)
     
-    # Save data
-    sio.savemat('BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
-    
     print('* Show test images... ')
-    for i in numpy.arange(21, 40):
+    for i in numpy.arange(21, 41):
         X_train, y_train = load_data(ImageShape, PatternShape, winSize, i)
         y_preds  = output_model(X_train)
         output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
