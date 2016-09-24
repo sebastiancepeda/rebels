@@ -22,23 +22,8 @@ from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 import utils
 import json
+import scipy.io as sio
 ###############################
-def load_data(ImageShape, PatternShape, winSize, n_image = 21):
-    print('Reading data. ')
-    features 	   = Image.open('../DRIVE/training/images/'+str(n_image)+'_training.tif','r')    
-    features     = numpy.fromstring(features.tobytes(), dtype='uint8', count=-1, sep='')
-    features     = numpy.reshape(features,ImageShape,'A')
-    image2     = Image.open('../DRIVE/training/1st_manual/'+str(n_image)+'_manual1.gif','r')
-    image2     = numpy.fromstring(image2.tobytes(), dtype='uint8', count=-1, sep='')
-    image2     = numpy.reshape(image2,PatternShape,'A')
-    train_set  = utils.sliding_window(features, stepSize=1, w=winSize, dim=ImageShape[2],output=0)
-    train_set = train_set.reshape(train_set.shape[0], numpy.floor(train_set.size/train_set.shape[0]).astype(int))
-    train_set_t  = utils.sliding_window(image2, stepSize=1, w=winSize, dim=1,output=1)
-    train_set_t = train_set_t[:,0]
-    print('Scaling data. ')
-    train_set = preprocessing.scale(train_set)
-    return train_set, train_set_t
-
 def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
     network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
     if drop_input:
@@ -75,7 +60,8 @@ def main():
     winSize        	    = (winSide,winSide)
     n_features     	    = ImageShape[2]*(winSide**2)
     # Loading dataset
-    X_train, y_train = load_data(ImageShape, PatternShape, winSize)
+    X_train, y_train, mask = utils.load_data(ImageShape, PatternShape, winSize)
+    mask = 0
     print("* Building model and compiling functions...")
     input_var = T.dmatrix('inputs')
     target_var = T.ivector('targets')
@@ -235,7 +221,7 @@ def main():
     
     print('* Show test images... ')
     for i in numpy.arange(21, 41):
-        X_train, y_train = load_data(ImageShape, PatternShape, winSize, i)
+        X_train, y_train = utils.load_data(ImageShape, PatternShape, winSize, i)
         y_preds  = output_model(X_train)
         output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
         aux_image = output_image

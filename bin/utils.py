@@ -1,4 +1,35 @@
 import numpy
+from PIL import Image
+from sklearn import preprocessing
+
+def load_data(ImageShape, PatternShape, winSize, n_image = 21):
+    print('Reading data. ')
+    #
+    x_image 	   = Image.open('../DRIVE/training/images/'+str(n_image)+'_training.tif','r')    
+    x_image     = numpy.fromstring(x_image.tobytes(), dtype='uint8', count=-1, sep='')
+    x_image     = numpy.reshape(x_image,ImageShape,'A')
+    #
+    t_image     = Image.open('../DRIVE/training/1st_manual/'+str(n_image)+'_manual1.gif','r')
+    t_image     = numpy.fromstring(t_image.tobytes(), dtype='uint8', count=-1, sep='')
+    t_image     = numpy.reshape(t_image,PatternShape,'A')
+    #
+    mask_image     = Image.open('../DRIVE/training/mask/'+str(n_image)+'_training_mask.gif','r')
+    mask_image     = numpy.fromstring(mask_image.tobytes(), dtype='uint8', count=-1, sep='')
+    mask_image     = numpy.reshape(mask_image,PatternShape,'A')
+    #
+    x  = sliding_window(x_image, stepSize=1, w=winSize, dim=ImageShape[2],output=0)
+    x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
+    #
+    t  = sliding_window(t_image, stepSize=1, w=winSize, dim=1,output=1)
+    t = t[:,0]
+    #
+    mask  = sliding_window(mask_image, stepSize=1, w=winSize, dim=1,output=1)
+    mask = mask[:,0]
+    print('Scaling data. ')
+    #x = preprocessing.scale(x)
+    min_max_scaler = preprocessing.MinMaxScaler()
+    x = min_max_scaler.fit_transform(x)
+    return x, t,  mask
 
 '''
 Metodo 
@@ -113,3 +144,18 @@ def reconstruct_image_3(e_preds,w,PatternShape):
             a += 1
     return output_image
     
+def get_error_image(output_image, t_image,  mask_image):
+    error_image = numpy.zeros((output_image.shape[0], output_image.shape[1], 3))
+    background = (1-mask_image)
+    tp_image    = output_image*t_image*mask_image
+    tn_image    = (1-output_image)*(1-t_image)*mask_image
+    fp_image    = output_image*(1-t_image)*mask_image
+    fn_image    = (1-output_image)*t_image*mask_image
+    r = background+fp_image
+    g = background+tp_image
+    b = background+fn_image
+    error_image[:, :, 0] = r
+    error_image[:, :, 1] = g
+    error_image[:, :, 2] = b
+    accuracy = (tp_image.sum()+tn_image.sum())/mask_image.sum()
+    return error_image,  accuracy
