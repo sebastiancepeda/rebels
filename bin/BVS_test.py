@@ -110,22 +110,25 @@ def main():
     w_t = numpy.load('../data/w_t.npy')
     params_updater(w_t)
     print('* Show test images... ')
-    for i in numpy.arange(21, 41):
-        print('Test image: {}'.format(i))
-        x, t,  mask = utils.load_data(ImageShape, PatternShape, winSize, i)
+    test_n = numpy.arange(21, 41)
+    test_idx    = numpy.arange(test_idx.size)
+    accuracy = numpy.zeros(test_n.size,)
+    for idx in test_idx:
+        print('Test image: {}'.format(idx))
+        x, t,  mask = utils.load_data(ImageShape, PatternShape, winSize, test_n[idx])
         y_preds  = output_model(x)
         x = 0
         output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
         t = utils.reconstruct_image_3(t,w=winSize, PatternShape=PatternShape)
         mask = utils.reconstruct_image_3(mask,w=winSize, PatternShape=PatternShape)
         # Print accuracy and debug 3 color image
-        error_image,  accuracy = utils.get_error_image(output_image, t, mask)
-        print('Accuracy[{}]: {}'.format(i, accuracy))
+        error_image,  accuracy[idx] = utils.get_error_image(output_image, t, mask)
+        print('Accuracy[{}]: {}'.format(test_n[idx], accuracy[idx]))
         error_image = numpy.floor(error_image*255)
-        cv2.imwrite('debug/error_image-'+str(i)+'.png',error_image)
+        cv2.imwrite('debug/error_image-'+str(test_n[idx])+'.png',error_image)
         # Output of model
         output_image = numpy.floor(output_image*255)
-        cv2.imwrite('debug/y_preds-'+str(i)+'.png',output_image)
+        cv2.imwrite('debug/y_preds-'+str(test_n[idx])+'.png',output_image)
 
 if __name__ == '__main__':
     main()

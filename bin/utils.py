@@ -32,7 +32,7 @@ def load_data(ImageShape, PatternShape, winSize, n_image = 21):
     return x, t,  mask
 
 '''
-Metodo 
+Method to balance the training set between the classes  
 '''
 def balance(x,  t):
     nv  = t.sum()
@@ -62,8 +62,8 @@ def balance(x,  t):
     return x2,  t2
 
 '''
-Si output == 0, se pasa por la imagen, devolviendo una lista de ventanas en torno a cada pixel. 
-Si output == 1, se devuelve una lista de 0's y 1's para representar fondo o vaso sanguineo. 
+if output == 0, for every pixel of the image, a list of pixels of a window around it is returned. 
+if output == 1, for every pixel of the image, 1 is returned if the pixel corresponds to a blood vessel, 0 otherwise. 
 '''
 def sliding_window(image, stepSize, w, dim,output):
     n1 = image.shape[0]
