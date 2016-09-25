@@ -28,5 +28,4 @@ The neural networks are based on Theano/Lasagne in Python.
 
 ### Who do I talk to? ###
 
-* Repo owner or admin
-* Other community or team contact
+* Sebastián Cepeda sebastian.cepeda.fuentealba@outlook.com
