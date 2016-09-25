@@ -7,12 +7,10 @@ The neural networks implementation are based on Theano/Lasagne in Python.
 
 ### How do I get set up? ###
 
-* Summary of set up
 * Configuration
 * Dependencies
 * Database configuration
 Is is necessary to download the [DRIVE database](http://www.isi.uu.nl/Research/Databases/DRIVE/download.php), and put it in /DRIVE folder. 
-* How to run tests
 * Deployment instructions
 
 ### Who do I talk to? ###
