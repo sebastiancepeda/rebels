@@ -9,6 +9,7 @@ The neural networks implementation are based on Theano/Lasagne in Python.
 
 * Configuration
 * Dependencies
+See "pip_freeze.txt". 
 * Database configuration
 
 Is is necessary to download the [DRIVE database](http://www.isi.uu.nl/Research/Databases/DRIVE/download.php), and put it in /DRIVE folder. 
