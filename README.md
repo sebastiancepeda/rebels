@@ -15,6 +15,7 @@ Listed in requirements.txt ("pip install -r requirements.txt").
 * Database configuration
 
 Is is necessary to download the [DRIVE database](http://www.isi.uu.nl/Research/Databases/DRIVE/download.php), and put it in /DRIVE folder. 
+
 * Deployment instructions
 
 ### Who do I talk to? ###
