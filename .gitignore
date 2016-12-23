@@ -1,5 +1,6 @@
 debug
-DRIVE
 *~
 *.pyc
+data_*
+DRIVE.zip
 
