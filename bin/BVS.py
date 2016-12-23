@@ -55,6 +55,7 @@ def main():
         ImageShape = config["image_shape"]
         ImageShape = (int(ImageShape[0]),int(ImageShape[1]),int(ImageShape[2]))
         alpha = float(config["alpha"])
+	learning_rate = float(config["learning_rate"])
     # Other global variables
     PatternShape   	= (ImageShape[0],ImageShape[1])
     winSize        	    = (winSide,winSide)
@@ -173,13 +174,11 @@ def main():
         auc_it = numpy.zeros(num_epochs)
         auc_x = numpy.zeros(num_epochs)
         m_r = 0.99
-        l_start = 1
-        l_end = 0.01
         it2 = 0
         for i in numpy.arange(num_epochs):
             dedw = fprime(w_t , *args)
             g_t = -dedw
-            l_r = l_end+(l_start-l_end)*(0.99**(i/10))
+            l_r = learning_rate
             m_t = m_r*m_t + g_t*l_r
             dw_t  = m_r*m_t + g_t*l_r
             w_t = w_t + dw_t

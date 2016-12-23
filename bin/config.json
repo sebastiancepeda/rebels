@@ -6,6 +6,7 @@
 "num_epochs":"10000",
 "window_side":"21",
 "alpha":"1.0",
-"image_shape":["584","565","3"]
+"image_shape":["584","565","3"],
+"learning_rate":"0.1"
 }
 
