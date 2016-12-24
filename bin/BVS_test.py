@@ -4,7 +4,6 @@ import sys
 import random
 import os
 import time
-import numpy as np
 import numpy
 import theano
 import theano.tensor as T
@@ -13,7 +12,7 @@ import scipy
 from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
-import glob, os
+import glob
 import csv
 import sqlite3
 import datetime
@@ -75,19 +74,6 @@ def main():
         grad_fn = theano.function([input_var, target_var], grad)
         grads = grads + [grad_fn]
     
-    def params_giver():
-        ws = []
-        for w in params:
-            params_fn = theano.function([],  w)
-            w_out = params_fn()
-            ws = numpy.append(ws,  w_out)
-        return ws
-    
-    def grad_giver(x,  t,  p_data):
-        gs = []
-        for grad_fn in grads:
-            gs = numpy.append(gs,  grad_fn(x,  t))
-        return gs
     '''
     Method that receives the new set of weights 
     and inserts them in the net. 
@@ -134,4 +120,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

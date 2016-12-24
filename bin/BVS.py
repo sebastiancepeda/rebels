@@ -16,7 +16,6 @@ import cv2
 import glob, os
 import csv
 import sqlite3
-import time
 import datetime
 from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
@@ -60,9 +59,7 @@ def main():
     PatternShape   	= (ImageShape[0],ImageShape[1])
     winSize        	    = (winSide,winSide)
     n_features     	    = ImageShape[2]*(winSide**2)
-    # Loading dataset
-    X_train, y_train, mask = utils.load_data(ImageShape, PatternShape, winSize)
-    mask = 0
+    
     print("* Building model and compiling functions...")
     input_var = T.dmatrix('inputs')
     target_var = T.ivector('targets')
@@ -141,14 +138,13 @@ def main():
         params_updater(params)
         return grad_giver(x, t.astype(numpy.int32), p_data)
     
-    def sampleData(training_data,  p_total,  n_samples = 10000):
-        x = training_data[0]
-        y = training_data[1]
-        inds = random.sample(range(training_data[0].shape[0]), n_samples)
-        x_out = x[inds,:]
-        y_out = y[inds]
-        return (x_out, y_out,  0)
-        
+    def sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std):
+        inds = random.sample(range(valid_windows), n_samples)
+        x, t = utils.sample_sliding_window(x_image,  t_image,winSize,ImageShape[2],x_mean, x_std,  inds)
+        x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
+        t = t.astype(numpy.int32)
+        return (x, t)
+    
     def getAUC(w_t,  X_train, y_train):
         params_updater(w_t)
         m_data = X_train.shape[0]
@@ -160,15 +156,22 @@ def main():
         auc = roc_auc_score(y_train, out)
         return auc
     
+    # Loading dataset
+    n1 = ImageShape[0]
+    n2 = ImageShape[1]
+    diff = (winSize[0]-1)//2
+    valid_windows = int(n1*n2-diff*2*(n1+n2)+4*diff*diff)
+    x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, 21)
+    x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
+    x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
+    
     def optimizer(func, x0, fprime, training_data, callback):
         print('* Optimizer method. ')
         n_samples = 1000
         w_t = x0
         m_t = 0
-        p = 1
-        train_data = sampleData(training_data,  p,  n_samples = n_samples)
-        args = (train_data[0], train_data[1])
-        e_t = func(w_t , *args)
+        train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
+        e_t = func(w_t , *train_data)
         e_it = numpy.zeros(num_epochs)
         de_it = numpy.zeros(num_epochs)
         auc_it = numpy.zeros(num_epochs)
@@ -176,18 +179,17 @@ def main():
         m_r = 0.99
         it2 = 0
         for i in numpy.arange(num_epochs):
-            dedw = fprime(w_t , *args)
+            dedw = fprime(w_t , *train_data)
             g_t = -dedw
             l_r = learning_rate
             m_t = m_r*m_t + g_t*l_r
             dw_t  = m_r*m_t + g_t*l_r
             w_t = w_t + dw_t
-            e_t = func(w_t , *args)
+            e_t = func(w_t , *train_data)
             e_it[i] = e_t
             if(i % 10 == 0):
-                train_data = sampleData(training_data,  p,  n_samples = n_samples)
-                args = (train_data[0], train_data[1])
-                print("i: {}, e_t: {}, l_r: {}".format(i, e_t,  l_r))
+                train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
+                print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
             if((i > 10) and (i % 50 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
@@ -216,17 +218,9 @@ def main():
                 img = numpy.floor(output_image*255)
                 cv2.imwrite('debug/image-last.png',img)
     
-    optimizer(func, x0=params_giver(), fprime=fprime, training_data=(X_train,y_train.astype(numpy.int32)),  callback=None)
+    optimizer(func, x0=params_giver(), fprime=fprime, training_data=None,  callback=None)
     
-    print('* Show test images... ')
-    for i in numpy.arange(21, 41):
-        X_train, y_train = utils.load_data(ImageShape, PatternShape, winSize, i)
-        y_preds  = output_model(X_train)
-        output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
-        aux_image = output_image
-        img = numpy.floor(output_image*255)
-        print('Test image: {}'.format(i))
-        cv2.imwrite('debug/y_preds-'+str(i)+'.png',img)
+    print('* End of optimization. ')
 
 if __name__ == '__main__':
     main()

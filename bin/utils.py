@@ -46,7 +46,7 @@ def load_data(ImageShape, PatternShape, winSize, n_image):
     x_image,  t_image,  mask_image = get_images(ImageShape, PatternShape, winSize, n_image)
     x_mean = get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
     x_std = get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
-    x  = sliding_window(x_image,1,winSize,ImageShape[2],0,x_mean, x_std)
+    x  = sliding_window(x_image,winSize,ImageShape[2],0,x_mean, x_std)
     x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
     t  = sliding_window(t_image, w=winSize, dim=1,output=1)
     t = t[:,0]
@@ -105,6 +105,37 @@ def get_predictions(image,  ImageShape, PatternShape, w,  output_model,  x_mean,
             y_preds[c] = output_model(sample)
             c += 1
     return y_preds
+
+def sample_sliding_window(x_image,  t_image,w,dim,x_mean, x_std,inds):
+    n1 = x_image.shape[0]
+    n2 = x_image.shape[1]
+    diff = (w[0]-1)/2
+    valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
+    value_t = numpy.zeros((len(inds),))
+    value_x = numpy.zeros((len(inds),w[0],w[1],dim))
+    width  = x_image.shape[0]-2*(w[0]//2)
+    height = x_image.shape[1]-2*(w[1]//2)
+    c = 0
+    for idx in inds:
+        x = idx / height + w[0]//2
+        y = idx % height + w[1]//2
+        # t
+        sample_t = t_image[x,y]
+        if(sample_t >= 127):
+            sample_t = 1
+        else:
+            sample_t = 0
+        value_t[c,] = sample_t
+        # x
+        window = x_image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
+        if window.shape[0] != w[0] or window.shape[1] != w[1]:
+            print('sample_sliding_window: Index error ')
+        sample_x = window.astype(numpy.float_)
+        sample_x -= x_mean
+        sample_x /= x_std
+        value_x[c,] = sample_x
+        c += 1
+    return value_x,  value_t
 
 '''
 if output == 0, for every pixel of the image, a list of pixels of a window around it is returned. 
