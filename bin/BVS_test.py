@@ -111,7 +111,7 @@ def main():
     params_updater(w_t)
     print('* Show test images... ')
     test_n = numpy.arange(21, 41)
-    test_idx    = numpy.arange(test_idx.size)
+    test_idx    = numpy.arange(test_n.size)
     accuracy = numpy.zeros(test_n.size,)
     for idx in test_idx:
         print('Test image: {}'.format(idx))
