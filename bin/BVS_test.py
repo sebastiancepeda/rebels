@@ -16,7 +16,6 @@ import cv2
 import glob, os
 import csv
 import sqlite3
-import time
 import datetime
 from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
@@ -114,15 +113,18 @@ def main():
     test_idx    = numpy.arange(test_n.size)
     accuracy = numpy.zeros(test_n.size,)
     for idx in test_idx:
-        print('Test image: {}'.format(idx))
-        x, t,  mask = utils.load_data(ImageShape, PatternShape, winSize, test_n[idx])
-        y_preds  = output_model(x)
-        x = 0
+        print('* Test image: {}'.format(idx))
+        x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, test_n[idx])
+        print('* get_mean. ')
+        x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
+        print('* get_std. ')
+        x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
+        print('* get_predictions. ')
+        y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
         output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
-        t = utils.reconstruct_image_3(t,w=winSize, PatternShape=PatternShape)
-        mask = utils.reconstruct_image_3(mask,w=winSize, PatternShape=PatternShape)
-        # Print accuracy and debug 3 color image
-        error_image,  accuracy[idx] = utils.get_error_image(output_image, t, mask)
+        t_image = t_image.astype(numpy.float_)/255
+        mask_image = mask_image.astype(numpy.float_)/255
+        error_image,  accuracy[idx] = utils.get_error_image(output_image, t_image, mask_image)
         print('Accuracy[{}]: {}'.format(test_n[idx], accuracy[idx]))
         error_image = numpy.floor(error_image*255)
         cv2.imwrite('debug/error_image-'+str(test_n[idx])+'.png',error_image)
@@ -132,3 +134,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
