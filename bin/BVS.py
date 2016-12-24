@@ -145,15 +145,9 @@ def main():
         t = t.astype(numpy.int32)
         return (x, t)
     
-    def getAUC(w_t,  X_train, y_train):
+    def getAUC(w_t,  y_preds,  y_train):
         params_updater(w_t)
-        m_data = X_train.shape[0]
-        output_train = numpy.zeros((m_data, 2))
-        points  = numpy.floor(numpy.linspace(0,m_data,m_data/1000)).astype(int)
-        for it in numpy.arange(points.size-1):
-            output_train[points[it]:points[it+1], :] = output_model(X_train[points[it]:points[it+1], :])
-        out = output_train[:,1]
-        auc = roc_auc_score(y_train, out)
+        auc = roc_auc_score(y_train, y_preds[:, 0])
         return auc
     
     # Loading dataset
@@ -194,11 +188,13 @@ def main():
             if((i > 10) and (i % 50 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
-                auc_it[it2] = getAUC(w_t,  X_train, y_train)
+                y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
+                t_data = utils.sliding_window(t_image, winSize, dim=1,output=1)
+                auc_it[it2] = getAUC(w_t,  y_preds,  t_data)
                 print('AUC: {}'.format(auc_it[it2]))
                 auc_x[it2] = i
                 it2 += 1
-            if((i > 10) and (i % 50 == 0)):
+                # debug images
                 fig, ax = plt.subplots(nrows=1, ncols=1)
                 ax.plot(numpy.arange(i), e_it[0:i], 'r-')
                 fig.savefig('debug/error.png')
@@ -212,9 +208,7 @@ def main():
                 fig.savefig('debug/auc.png')
                 plt.close(fig)
                 print('Show test imge... ')
-                y_preds  = output_model(X_train)
                 output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
-                aux_image = output_image
                 img = numpy.floor(output_image*255)
                 cv2.imwrite('debug/image-last.png',img)
     
