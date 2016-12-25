@@ -140,6 +140,7 @@ def main():
     
     def sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std):
         inds = random.sample(range(valid_windows), n_samples)
+        #inds = range(valid_windows)
         x, t = utils.sample_sliding_window(x_image,  t_image,winSize,ImageShape[2],x_mean, x_std,  inds)
         x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
         t = t.astype(numpy.int32)
@@ -185,7 +186,7 @@ def main():
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
                 print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
-            if((i > 10) and (i % 50 == 0)):
+            if((i > 10) and (i % 100 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
