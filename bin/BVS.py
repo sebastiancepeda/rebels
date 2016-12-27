@@ -148,7 +148,7 @@ def main():
     
     def getAUC(w_t,  y_preds,  y_train):
         params_updater(w_t)
-        auc = roc_auc_score(y_train, y_preds[:, 0])
+        auc = roc_auc_score(y_train, y_preds[:, 1])
         return auc
     
     # Loading dataset

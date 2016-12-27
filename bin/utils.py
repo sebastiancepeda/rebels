@@ -39,7 +39,7 @@ def get_std(x_image,  w,  dim, ImageShape,  mean_sample):
                 continue
             sample = (window.astype(numpy.float_) - mean_sample)**2
             std_sample += sample/n_samples
-    return std_sample
+    return numpy.sqrt(std_sample)
 
 def load_data(ImageShape, PatternShape, winSize, n_image):
     print('Reading data. ')
@@ -99,8 +99,8 @@ def get_predictions(image,  ImageShape, PatternShape, w,  output_model,  x_mean,
             if window.shape[0] != w[0] or window.shape[1] != w[1]:
                 continue
             sample = window.astype(numpy.float_)
-            #sample -= x_mean
-            #sample /= x_std
+            sample -= x_mean
+            sample /= x_std
             sample = sample.reshape(1,sample.size)
             y_preds[c] = output_model(sample)
             c += 1
@@ -131,8 +131,8 @@ def sample_sliding_window(x_image,  t_image,w,dim,x_mean, x_std,inds):
         if window.shape[0] != w[0] or window.shape[1] != w[1]:
             print('sample_sliding_window: Index error ')
         sample_x = window.astype(numpy.float_)
-        #sample_x -= x_mean
-        #sample_x /= x_std
+        sample_x -= x_mean
+        sample_x /= x_std
         value_x[c,] = sample_x
         c += 1
     return value_x,  value_t
