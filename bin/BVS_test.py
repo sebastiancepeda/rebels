@@ -51,6 +51,7 @@ def main():
         winSide = int(config["window_side"])    
         ImageShape = config["image_shape"]
         ImageShape = (int(ImageShape[0]),int(ImageShape[1]),int(ImageShape[2]))
+        ValidationSet = utils.getValues(config["validation_set"])
         alpha = float(config["alpha"])
     # Other global variables
     PatternShape   	= (ImageShape[0],ImageShape[1])
@@ -95,7 +96,7 @@ def main():
     w_t = numpy.load('../data/w_t.npy')
     params_updater(w_t)
     print('* Show test images... ')
-    test_n = numpy.arange(21, 41)
+    test_n = ValidationSet
     test_idx    = numpy.arange(test_n.size)
     accuracy = numpy.zeros(test_n.size,)
     for idx in test_idx:

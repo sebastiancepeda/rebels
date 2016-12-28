@@ -234,3 +234,12 @@ def get_error_image(output_image, t_image,  mask_image):
     error_image[:, :, 2] = b
     accuracy = (tp_image.sum()+tn_image.sum())/mask_image.sum()
     return error_image,  accuracy
+
+def getValues(set):
+    n_items = len(set)
+    result = numpy.zeros(n_items)
+    idx = 0
+    for item in set:
+        result[idx] = int(item)
+        idx += 1
+    return result.astype(int)

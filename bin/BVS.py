@@ -53,6 +53,7 @@ def main():
         winSide = int(config["window_side"])    
         ImageShape = config["image_shape"]
         ImageShape = (int(ImageShape[0]),int(ImageShape[1]),int(ImageShape[2]))
+        TrainingSet = utils.getValues(config["training_set"])
         alpha = float(config["alpha"])
 	learning_rate = float(config["learning_rate"])
     # Other global variables
@@ -151,20 +152,19 @@ def main():
         auc = roc_auc_score(y_train, y_preds[:, 1])
         return auc
     
-    # Loading dataset
-    n1 = ImageShape[0]
-    n2 = ImageShape[1]
-    diff = (winSize[0]-1)//2
-    valid_windows = int(n1*n2-diff*2*(n1+n2)+4*diff*diff)
-    x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, 21)
-    x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
-    x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
-    
     def optimizer(func, x0, fprime, training_data, callback):
+        n1 = ImageShape[0]
+        n2 = ImageShape[1]
+        diff = (winSize[0]-1)//2
+        valid_windows = int(n1*n2-diff*2*(n1+n2)+4*diff*diff)
         print('* Optimizer method. ')
+        training_set_idx = 0
         n_samples = 1000
         w_t = x0
         m_t = 0
+        x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, TrainingSet[training_set_idx])
+        x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
+        x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
         train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
         e_t = func(w_t , *train_data)
         e_it = numpy.zeros(num_epochs)
@@ -186,7 +186,12 @@ def main():
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
                 print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
-            if((i > 10) and (i % 100 == 0)):
+            if((i>10) and (i % 100 == 0)):
+                training_set_idx = (training_set_idx + 1) % TrainingSet.size
+                x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, TrainingSet[training_set_idx])
+                x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
+                x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
+            if((i > 10) and (i % 50 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
@@ -211,10 +216,9 @@ def main():
                 print('Show test imge... ')
                 output_image = utils.reconstruct_image(y_preds,w=winSize, PatternShape=PatternShape, alpha=alpha)
                 img = numpy.floor(output_image*255)
-                cv2.imwrite('debug/image-last.png',img)
+                cv2.imwrite('debug/image-last-{}.png'.format(TrainingSet[training_set_idx]),img)
     
     optimizer(func, x0=params_giver(), fprime=fprime, training_data=None,  callback=None)
-    
     print('* End of optimization. ')
 
 if __name__ == '__main__':
