@@ -22,24 +22,7 @@ from sklearn.metrics import roc_auc_score
 import utils
 import json
 import scipy.io as sio
-###############################
-def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
-    network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
-    if drop_input:
-        network = lasagne.layers.dropout(network, p=drop_input)
-    # Hidden layers and dropout:
-    #nonlin = lasagne.nonlinearities.very_leaky_rectify
-    nonlin = lasagne.nonlinearities.leaky_rectify
-    for _ in range(depth):
-        network = lasagne.layers.DenseLayer(network, width, nonlinearity=nonlin)
-        if drop_hidden:
-            network = lasagne.layers.dropout(network, p=drop_hidden)
-    # Output layer:
-    last_nonlin = lasagne.nonlinearities.softmax
-    network = lasagne.layers.DenseLayer(network, 2, nonlinearity=last_nonlin)
-    return network
 
-# ############################## Main program ################################
 def main():
     print('* Start! ')
     print('* Loading config.json')
@@ -55,7 +38,8 @@ def main():
         ImageShape = (int(ImageShape[0]),int(ImageShape[1]),int(ImageShape[2]))
         TrainingSet = utils.getValues(config["training_set"])
         alpha = float(config["alpha"])
-	learning_rate = float(config["learning_rate"])
+        learning_rate = float(config["learning_rate"])
+    
     # Other global variables
     PatternShape   	= (ImageShape[0],ImageShape[1])
     winSize        	    = (winSide,winSide)
@@ -64,7 +48,7 @@ def main():
     print("* Building model and compiling functions...")
     input_var = T.dmatrix('inputs')
     target_var = T.ivector('targets')
-    network = build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
+    network = utils.build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
@@ -197,7 +181,7 @@ def main():
                 x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, TrainingSet[training_set_idx])
                 x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
                 x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
-            if((i > 10) and (i % 200 == 0)):
+            if((i > 10) and (i % 800 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)

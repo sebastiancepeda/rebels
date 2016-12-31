@@ -1,6 +1,7 @@
 import numpy
 from PIL import Image
 from sklearn import preprocessing
+import lasagne
 
 def get_images(ImageShape, PatternShape, winSize, n_image):
     x_image 	   = Image.open('../DRIVE/training/images/'+str(n_image)+'_training.tif','r')    
@@ -243,3 +244,19 @@ def getValues(set):
         result[idx] = int(item)
         idx += 1
     return result.astype(int)
+
+def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
+    network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
+    if drop_input:
+        network = lasagne.layers.dropout(network, p=drop_input)
+    # Hidden layers and dropout:
+    #nonlin = lasagne.nonlinearities.very_leaky_rectify
+    nonlin = lasagne.nonlinearities.leaky_rectify
+    for _ in range(depth):
+        network = lasagne.layers.DenseLayer(network, width, nonlinearity=nonlin)
+        if drop_hidden:
+            network = lasagne.layers.dropout(network, p=drop_hidden)
+    # Output layer:
+    last_nonlin = lasagne.nonlinearities.softmax
+    network = lasagne.layers.DenseLayer(network, 2, nonlinearity=last_nonlin)
+    return network

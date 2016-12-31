@@ -20,22 +20,6 @@ from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 import utils
 import json
-###############################
-def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
-    network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
-    if drop_input:
-        network = lasagne.layers.dropout(network, p=drop_input)
-    # Hidden layers and dropout:
-    #nonlin = lasagne.nonlinearities.very_leaky_rectify
-    nonlin = lasagne.nonlinearities.leaky_rectify
-    for _ in range(depth):
-        network = lasagne.layers.DenseLayer(network, width, nonlinearity=nonlin)
-        if drop_hidden:
-            network = lasagne.layers.dropout(network, p=drop_hidden)
-    # Output layer:
-    last_nonlin = lasagne.nonlinearities.softmax
-    network = lasagne.layers.DenseLayer(network, 2, nonlinearity=last_nonlin)
-    return network
 
 # ############################## Main program ################################
 def main():
@@ -60,7 +44,7 @@ def main():
     print("* Building model and compiling functions...")
     input_var = T.dmatrix('inputs')
     target_var = T.ivector('targets')
-    network = build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
+    network = utils.build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
@@ -68,12 +52,14 @@ def main():
     params = lasagne.layers.get_all_params(network, trainable=True)
     train_fn = theano.function([input_var, target_var], [loss])
     output_model = theano.function([input_var], prediction)
-    # grads compilation
-    grads = []
+    # compilation
+    comp_params_updater = []
     for w in params:
-        grad = T.grad(loss,  w)
-        grad_fn = theano.function([input_var, target_var], grad)
-        grads = grads + [grad_fn]
+        w_in = T.dmatrix()
+        if(w_in.type != w.type):
+            w_in = T.dvector()
+        w_update = theano.function([w_in], updates=[(w, w_in)])
+        comp_params_updater = comp_params_updater + [w_update]
     
     '''
     Method that receives the new set of weights 
@@ -81,16 +67,15 @@ def main():
     '''
     def params_updater(all_w):
         idx_init = 0
-        for w in params:
-            w_in = T.dmatrix()
-            if(w_in.type != w.type):
-                w_in = T.dvector()
-            w_update = theano.function([w_in], updates=[(w, w_in)])
+        params_idx = 0
+        for w_updater in comp_params_updater:
+            w = params[params_idx]
+            params_idx += 1
             w_value_pre = w.get_value()
             w_act = all_w[idx_init:idx_init+w_value_pre.size]
             w_value = w_act.reshape(w_value_pre.shape)
             idx_init += w_value_pre.size
-            w_update(w_value)
+            w_updater(w_value)
         return
     
     w_t = numpy.load('../data/w_t.npy')
