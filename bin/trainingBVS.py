@@ -72,25 +72,32 @@ def main():
     params = lasagne.layers.get_all_params(network, trainable=True)
     train_fn = theano.function([input_var, target_var], [loss])
     output_model = theano.function([input_var], prediction)
-    # grads compilation
-    grads = []
+    # compilation
+    comp_grads = []
+    comp_params_giver = []
+    comp_params_updater = []
     for w in params:
         grad = T.grad(loss,  w)
         grad_fn = theano.function([input_var, target_var], grad)
-        grads = grads + [grad_fn]
+        comp_grads = comp_grads + [grad_fn]
+        params_fn = theano.function([],  w)
+        comp_params_giver = comp_params_giver + [params_fn]
+        w_in = T.dmatrix()
+        if(w_in.type != w.type):
+            w_in = T.dvector()
+        w_update = theano.function([w_in], updates=[(w, w_in)])
+        comp_params_updater = comp_params_updater + [w_update]
     
     def params_giver():
         ws = []
-        for w in params:
-            params_fn = theano.function([],  w)
-            w_out = params_fn()
-            ws = numpy.append(ws,  w_out)
+        for param_fn in comp_params_giver:
+            ws = numpy.append(ws, param_fn())
         return ws
     
     def grad_giver(x,  t,  p_data):
         gs = []
-        for grad_fn in grads:
-            gs = numpy.append(gs,  grad_fn(x,  t))
+        for grad_fn in comp_grads:
+            gs = numpy.append(gs, grad_fn(x,  t))
         return gs
     '''
     Method that receives the new set of weights 
@@ -98,16 +105,15 @@ def main():
     '''
     def params_updater(all_w):
         idx_init = 0
-        for w in params:
-            w_in = T.dmatrix()
-            if(w_in.type != w.type):
-                w_in = T.dvector()
-            w_update = theano.function([w_in], updates=[(w, w_in)])
+        params_idx = 0
+        for w_updater in comp_params_updater:
+            w = params[params_idx]
+            params_idx += 1
             w_value_pre = w.get_value()
             w_act = all_w[idx_init:idx_init+w_value_pre.size]
             w_value = w_act.reshape(w_value_pre.shape)
             idx_init += w_value_pre.size
-            w_update(w_value)
+            w_updater(w_value)
         return
     
     '''
@@ -186,12 +192,12 @@ def main():
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
                 print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
-            if((i>10) and (i % 100 == 0)):
+            if((i>10) and (i % 200 == 0)):
                 training_set_idx = (training_set_idx + 1) % TrainingSet.size
                 x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, TrainingSet[training_set_idx])
                 x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
                 x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
-            if((i > 10) and (i % 50 == 0)):
+            if((i > 10) and (i % 100 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
