@@ -188,16 +188,16 @@ def main():
             w_t = w_t + dw_t
             e_t = func(w_t , *train_data)
             e_it[i] = e_t
-            if(i % 10 == 0):
+            if(i % 50 == 0):
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
                 print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
-            if((i>10) and (i % 200 == 0)):
+            if((i>10) and (i % 400 == 0)):
                 training_set_idx = (training_set_idx + 1) % TrainingSet.size
                 x_image,  t_image,  mask_image = utils.get_images(ImageShape, PatternShape, winSize, TrainingSet[training_set_idx])
                 x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
                 x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
-            if((i > 10) and (i % 100 == 0)):
+            if((i > 10) and (i % 200 == 0)):
                 numpy.save('../data/w_t.npy',w_t)
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
