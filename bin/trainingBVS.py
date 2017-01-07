@@ -6,6 +6,13 @@ import os
 import time
 import numpy as np
 import numpy
+
+import os
+# Theano flags 
+os.environ['THEANO_FLAGS'] = "mode=FAST_RUN"
+os.environ['THEANO_FLAGS'] = "device=gpu"
+os.environ['THEANO_FLAGS'] = "floatX=float32"
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -39,14 +46,14 @@ def main():
         TrainingSet = utils.getValues(config["training_set"])
         alpha = float(config["alpha"])
         learning_rate = float(config["learning_rate"])
-    
+       
     # Other global variables
     PatternShape   	= (ImageShape[0],ImageShape[1])
     winSize        	    = (winSide,winSide)
     n_features     	    = ImageShape[2]*(winSide**2)
     
     print("* Building model and compiling functions...")
-    input_var = T.dmatrix('inputs')
+    input_var = T.matrix('inputs')
     target_var = T.ivector('targets')
     network = utils.build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
     prediction = lasagne.layers.get_output(network)
@@ -66,9 +73,9 @@ def main():
         comp_grads = comp_grads + [grad_fn]
         params_fn = theano.function([],  w)
         comp_params_giver = comp_params_giver + [params_fn]
-        w_in = T.dmatrix()
+        w_in = T.matrix()
         if(w_in.type != w.type):
-            w_in = T.dvector()
+            w_in = T.vector()
         w_update = theano.function([w_in], updates=[(w, w_in)])
         comp_params_updater = comp_params_updater + [w_update]
     
@@ -83,6 +90,7 @@ def main():
         for grad_fn in comp_grads:
             gs = numpy.append(gs, grad_fn(x,  t))
         return gs
+    
     ''' Updates the weights (w) in the net. '''
     def params_updater(all_w):
         idx_init = 0
@@ -104,7 +112,7 @@ def main():
         if(len(args) >= 3):
             p_data = args[2]
         params_updater(params)
-        return train_fn(x,  t.astype(numpy.int32))[0]
+        return train_fn(x.astype('float32'),  t.astype(numpy.int32))[0]
     
     ''' Returns the derivative of the loss with respect to the weights, given (x, t, w). '''
     def fprime(params, *args):
@@ -122,7 +130,7 @@ def main():
         x, t = utils.sample_sliding_window(x_image,  t_image,winSize,ImageShape[2],x_mean, x_std,  inds)
         x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
         t = t.astype(numpy.int32)
-        return (x, t)
+        return (x.astype('float32'), t)
     
     def getAUC(w_t,  y_preds,  y_train):
         params_updater(w_t)
@@ -143,7 +151,7 @@ def main():
         x_mean = utils.get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
         x_std = utils.get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
         train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
-        e_t = func(w_t , *train_data)
+        e_t = func(w_t.astype('float32'), *train_data)
         e_it = numpy.zeros(num_epochs)
         de_it = numpy.zeros(num_epochs)
         auc_it = numpy.zeros(num_epochs)
@@ -151,13 +159,13 @@ def main():
         m_r = 0.99
         it2 = 0
         for i in numpy.arange(num_epochs):
-            dedw = fprime(w_t , *train_data)
+            dedw = fprime(w_t.astype('float32') , *train_data)
             g_t = -dedw
             l_r = learning_rate
             m_t = m_r*m_t + g_t*l_r
             dw_t  = m_r*m_t + g_t*l_r
             w_t = w_t + dw_t
-            e_t = func(w_t , *train_data)
+            e_t = func(w_t.astype('float32') , *train_data)
             e_it[i] = e_t
             if(i % 50 == 0):
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
@@ -173,7 +181,7 @@ def main():
                 sio.savemat('../data/BVS_data.mat', {'depth':depth,'width':width,'drop_in':drop_in,'drop_hid':drop_hid,'w_t':w_t})
                 y_preds = utils.get_predictions(x_image, ImageShape, PatternShape, winSize, output_model,  x_mean, x_std)
                 t_data = utils.sliding_window(t_image, winSize, dim=1,output=1)
-                auc_it[it2] = getAUC(w_t,  y_preds,  t_data)
+                auc_it[it2] = getAUC(w_t.astype('float32'),  y_preds,  t_data)
                 print('AUC: {}'.format(auc_it[it2]))
                 auc_x[it2] = i
                 it2 += 1

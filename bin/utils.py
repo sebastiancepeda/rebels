@@ -103,7 +103,7 @@ def get_predictions(image,  ImageShape, PatternShape, w,  output_model,  x_mean,
             sample -= x_mean
             sample /= x_std
             sample = sample.reshape(1,sample.size)
-            y_preds[c] = output_model(sample)
+            y_preds[c] = output_model(sample.astype('float32'))
             c += 1
     return y_preds
 

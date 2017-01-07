@@ -5,6 +5,13 @@ import random
 import os
 import time
 import numpy
+
+import os
+# Theano flags 
+os.environ['THEANO_FLAGS'] = "mode=FAST_RUN"
+os.environ['THEANO_FLAGS'] = "device=gpu"
+os.environ['THEANO_FLAGS'] = "floatX=float32"
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -42,7 +49,7 @@ def main():
     winSize        	    = (winSide,winSide)
     n_features     	    = ImageShape[2]*(winSide**2)
     print("* Building model and compiling functions...")
-    input_var = T.dmatrix('inputs')
+    input_var = T.matrix('inputs')
     target_var = T.ivector('targets')
     network = utils.build_custom_mlp(n_features, input_var, depth, width, drop_in, drop_hid)
     prediction = lasagne.layers.get_output(network)
@@ -53,9 +60,9 @@ def main():
     # compilation
     comp_params_updater = []
     for w in params:
-        w_in = T.dmatrix()
+        w_in = T.matrix()
         if(w_in.type != w.type):
-            w_in = T.dvector()
+            w_in = T.vector()
         w_update = theano.function([w_in], updates=[(w, w_in)])
         comp_params_updater = comp_params_updater + [w_update]
     
