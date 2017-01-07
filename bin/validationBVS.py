@@ -48,9 +48,7 @@ def main():
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
-    loss = error.mean()/n_features
     params = lasagne.layers.get_all_params(network, trainable=True)
-    train_fn = theano.function([input_var, target_var], [loss])
     output_model = theano.function([input_var], prediction)
     # compilation
     comp_params_updater = []

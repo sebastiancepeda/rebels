@@ -52,7 +52,7 @@ def main():
     prediction = lasagne.layers.get_output(network)
     t2 = theano.tensor.extra_ops.to_one_hot(target_var, 2, dtype='int32')
     error = lasagne.objectives.categorical_crossentropy(prediction, t2)
-    loss = error.mean()/n_features
+    loss = error.mean()
     params = lasagne.layers.get_all_params(network, trainable=True)
     train_fn = theano.function([input_var, target_var], [loss])
     output_model = theano.function([input_var], prediction)
@@ -83,10 +83,7 @@ def main():
         for grad_fn in comp_grads:
             gs = numpy.append(gs, grad_fn(x,  t))
         return gs
-    '''
-    Method that receives the new set of weights 
-    and inserts them in the net. 
-    '''
+    ''' Updates the weights (w) in the net. '''
     def params_updater(all_w):
         idx_init = 0
         params_idx = 0
@@ -100,12 +97,7 @@ def main():
             w_updater(w_value)
         return
     
-    '''
-    Method that receives the weights (params), training data (args), 
-    and returns the loss on the data. 
-    It also receives the new set of weights 
-    and inserts them in the net. 
-    '''
+    ''' Returns the loss, given (x,t,w). '''
     def func(params, *args):
         x = args[0]
         t = args[1]
@@ -114,11 +106,7 @@ def main():
         params_updater(params)
         return train_fn(x,  t.astype(numpy.int32))[0]
     
-    '''
-    Method that receives the weights (params), training data (args)
-    and returns the derivative of the loss on the data with 
-    respect to the weights. 
-    '''
+    ''' Returns the derivative of the loss with respect to the weights, given (x, t, w). '''
     def fprime(params, *args):
         x = args[0]
         t = args[1]
@@ -131,7 +119,6 @@ def main():
     
     def sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std):
         inds = random.sample(range(valid_windows), n_samples)
-        #inds = range(valid_windows)
         x, t = utils.sample_sliding_window(x_image,  t_image,winSize,ImageShape[2],x_mean, x_std,  inds)
         x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
         t = t.astype(numpy.int32)
