@@ -1,7 +1,62 @@
 import numpy
+from PIL import Image
+from sklearn import preprocessing
+import lasagne
+
+def get_images(ImageShape, PatternShape, winSize, n_image):
+    x_image 	   = Image.open('../DRIVE/training/images/'+str(n_image)+'_training.tif','r')    
+    x_image     = numpy.fromstring(x_image.tobytes(), dtype='uint8', count=-1, sep='')
+    x_image     = numpy.reshape(x_image,ImageShape,'A')
+    
+    t_image     = Image.open('../DRIVE/training/1st_manual/'+str(n_image)+'_manual1.gif','r')
+    t_image     = numpy.fromstring(t_image.tobytes(), dtype='uint8', count=-1, sep='')
+    t_image     = numpy.reshape(t_image,PatternShape,'A')
+    
+    mask_image     = Image.open('../DRIVE/training/mask/'+str(n_image)+'_training_mask.gif','r')
+    mask_image     = numpy.fromstring(mask_image.tobytes(), dtype='uint8', count=-1, sep='')
+    mask_image     = numpy.reshape(mask_image,PatternShape,'A')
+    
+    return x_image,  t_image,  mask_image
+
+def get_mean(x_image,  w,  dim,  ImageShape):
+    mean_sample = numpy.zeros((w[0],w[1],dim))
+    n_samples = (ImageShape[0]-w[0]//2)*(ImageShape[1]-w[1]//2)
+    # slide a window across the image
+    for x in xrange(w[0]//2, ImageShape[0]-w[0]//2, 1):
+        for y in xrange(w[1]//2, ImageShape[1]-w[1]//2, 1):
+            window = x_image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
+            if window.shape[0] != w[0] or window.shape[1] != w[1]:
+                continue
+            mean_sample += window.astype(numpy.float_)/n_samples
+    return mean_sample
+
+def get_std(x_image,  w,  dim, ImageShape,  mean_sample):
+    std_sample = numpy.zeros((w[0],w[1],dim))
+    n_samples = (ImageShape[0]-w[0]//2)*(ImageShape[1]-w[1]//2)
+    for x in xrange(w[0]//2, ImageShape[0]-w[0]//2, 1):
+        for y in xrange(w[1]//2, ImageShape[1]-w[1]//2, 1):
+            window = x_image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
+            if window.shape[0] != w[0] or window.shape[1] != w[1]:
+                continue
+            sample = (window.astype(numpy.float_) - mean_sample)**2
+            std_sample += sample/n_samples
+    return numpy.sqrt(std_sample)
+
+def load_data(ImageShape, PatternShape, winSize, n_image):
+    print('Reading data. ')
+    x_image,  t_image,  mask_image = get_images(ImageShape, PatternShape, winSize, n_image)
+    x_mean = get_mean(x_image,  winSize,  ImageShape[2],  ImageShape)
+    x_std = get_std(x_image,  winSize,  ImageShape[2],  ImageShape,  x_mean)
+    x  = sliding_window(x_image,winSize,ImageShape[2],0,x_mean, x_std)
+    x = x.reshape(x.shape[0], numpy.floor(x.size/x.shape[0]).astype(int))
+    t  = sliding_window(t_image, w=winSize, dim=1,output=1)
+    t = t[:,0]
+    mask  = sliding_window(mask_image, w=winSize, dim=1,output=1)
+    mask = mask[:,0]
+    return x, t,  mask
 
 '''
-Metodo 
+Method to balance the training set between the classes  
 '''
 def balance(x,  t):
     nv  = t.sum()
@@ -30,25 +85,76 @@ def balance(x,  t):
     print(t2.size)
     return x2,  t2
 
+def get_predictions(image,  ImageShape, PatternShape, w,  output_model,  x_mean,  x_std):
+    n_batch = 100
+    n1 = image.shape[0]
+    n2 = image.shape[1]
+    diff = (w[0]-1)/2
+    valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
+    y_preds = numpy.zeros((valid_windows,2))
+    c = 0
+    # slide a window across the image
+    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, 1):
+        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, 1):
+            window = image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
+            if window.shape[0] != w[0] or window.shape[1] != w[1]:
+                continue
+            sample = window.astype(numpy.float_)
+            sample -= x_mean
+            sample /= x_std
+            sample = sample.reshape(1,sample.size)
+            y_preds[c] = output_model(sample.astype('float32'))
+            c += 1
+    return y_preds
+
+def sample_sliding_window(x_image,  t_image,w,dim,x_mean, x_std,inds):
+    n1 = x_image.shape[0]
+    n2 = x_image.shape[1]
+    diff = (w[0]-1)/2
+    valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
+    value_t = numpy.zeros((len(inds),))
+    value_x = numpy.zeros((len(inds),w[0],w[1],dim))
+    width  = x_image.shape[0]-2*(w[0]//2)
+    height = x_image.shape[1]-2*(w[1]//2)
+    c = 0
+    for idx in inds:
+        x = idx / height + w[0]//2
+        y = idx % height + w[1]//2
+        # t
+        sample_t = t_image[x,y]
+        if(sample_t >= 127):
+            sample_t = 1
+        else:
+            sample_t = 0
+        value_t[c,] = sample_t
+        # x
+        window = x_image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
+        if window.shape[0] != w[0] or window.shape[1] != w[1]:
+            print('sample_sliding_window: Index error ')
+        sample_x = window.astype(numpy.float_)
+        sample_x -= x_mean
+        sample_x /= x_std
+        value_x[c,] = sample_x
+        c += 1
+    return value_x,  value_t
+
 '''
-Si output == 0, se pasa por la imagen, devolviendo una lista de ventanas en torno a cada pixel. 
-Si output == 1, se devuelve una lista de 0's y 1's para representar fondo o vaso sanguineo. 
+if output == 0, for every pixel of the image, a list of pixels of a window around it is returned. 
+if output == 1, for every pixel of the image, 1 is returned if the pixel corresponds to a blood vessel, 0 otherwise. 
 '''
-def sliding_window(image, stepSize, w, dim,output):
+def sliding_window(image, w, dim,output,  x_mean=0.0,  x_std=1.0):
     n1 = image.shape[0]
     n2 = image.shape[1]
     diff = (w[0]-1)/2
     valid_windows = n1*n2-diff*2*(n1+n2)+4*diff*diff
     if(output == 1):
         value = numpy.zeros((valid_windows,1))
-        mean_sample = numpy.zeros((1,1))
     else:
         value = numpy.zeros((valid_windows,w[0],w[1],dim))
-        mean_sample = numpy.zeros((w[0],w[1],dim))
     c = 0
     # slide a window across the image
-    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, stepSize):
-        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, stepSize):
+    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, 1):
+        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, 1):
             # If it is the groundtruth that is being streamed
             if(output == 1):
                 sample = image[x,y]
@@ -61,13 +167,14 @@ def sliding_window(image, stepSize, w, dim,output):
                 window = image[(x-w[0]//2):(x+w[0]//2+1), (y-w[1]//2):(y+w[1]//2+1)]
                 if window.shape[0] != w[0] or window.shape[1] != w[1]:
                     continue
-                sample = window
+                sample = window.astype(numpy.float_)
+                sample -= x_mean
+                sample /= x_std
                 value[c,] = sample
             c += 1
-            mean_sample += sample/c
-    return value - mean_sample
+    return value
 
-def sliding_window2(image, stepSize, w, dim):
+def sliding_window2(image, w, dim):
     n1 = image.shape[0]
     n2 = image.shape[1]
     diff = (w[0]-1)/2
@@ -75,8 +182,8 @@ def sliding_window2(image, stepSize, w, dim):
     value = numpy.zeros((valid_windows,1))
     c = 0
     # slide a window across the image
-    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, stepSize):
-        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, stepSize):
+    for x in xrange(w[0]//2, image.shape[0]-w[0]//2, 1):
+        for y in xrange(w[1]//2, image.shape[1]-w[1]//2, 1):
             # If it is the groundtruth that is being streamed
             sample = image[x,y]
             value[c,] = sample
@@ -88,7 +195,7 @@ def reconstruct_image(y_preds,w, PatternShape, alpha):
     output_image = numpy.zeros((PatternShape[0],PatternShape[1]))
     for x in xrange(w[0]//2, PatternShape[0]-w[0]//2, 1):
         for y in xrange(w[1]//2, PatternShape[1]-w[1]//2, 1):
-            if(y_preds[a][0][0] > y_preds[a][0][1]*alpha):
+            if(y_preds[a][0] > y_preds[a][1]*alpha):
                 output_image[x][y] = 0
             else:
                 output_image[x][y] = 1
@@ -113,3 +220,43 @@ def reconstruct_image_3(e_preds,w,PatternShape):
             a += 1
     return output_image
     
+def get_error_image(output_image, t_image,  mask_image):
+    error_image = numpy.zeros((output_image.shape[0], output_image.shape[1], 3))
+    background = (1-mask_image)
+    tp_image    = output_image*t_image*mask_image
+    tn_image    = (1-output_image)*(1-t_image)*mask_image
+    fp_image    = output_image*(1-t_image)*mask_image
+    fn_image    = (1-output_image)*t_image*mask_image
+    r = background+fp_image
+    g = background+tp_image
+    b = background+fn_image
+    error_image[:, :, 0] = r
+    error_image[:, :, 1] = g
+    error_image[:, :, 2] = b
+    accuracy = (tp_image.sum()+tn_image.sum())/mask_image.sum()
+    return error_image,  accuracy
+
+def getValues(set):
+    n_items = len(set)
+    result = numpy.zeros(n_items)
+    idx = 0
+    for item in set:
+        result[idx] = int(item)
+        idx += 1
+    return result.astype(int)
+
+def build_custom_mlp(n_features, input_var=None, depth=2, width=800, drop_input=.2, drop_hidden=.5):
+    network = lasagne.layers.InputLayer(shape=(None, n_features), input_var=input_var)
+    if drop_input:
+        network = lasagne.layers.dropout(network, p=drop_input)
+    # Hidden layers and dropout:
+    #nonlin = lasagne.nonlinearities.very_leaky_rectify
+    nonlin = lasagne.nonlinearities.leaky_rectify
+    for _ in range(depth):
+        network = lasagne.layers.DenseLayer(network, width, nonlinearity=nonlin)
+        if drop_hidden:
+            network = lasagne.layers.dropout(network, p=drop_hidden)
+    # Output layer:
+    last_nonlin = lasagne.nonlinearities.softmax
+    network = lasagne.layers.DenseLayer(network, 2, nonlinearity=last_nonlin)
+    return network
