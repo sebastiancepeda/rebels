@@ -10,7 +10,7 @@ The neural networks implementation are based on Theano/Lasagne in Python.
 * Configuration
 * Dependencies
 
-Listed in requirements.txt ("pip install -r requirements.txt"). 
+Listed in README.txt
 
 * Database configuration
 
