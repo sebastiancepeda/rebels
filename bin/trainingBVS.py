@@ -13,6 +13,9 @@ os.environ['THEANO_FLAGS'] = "mode=FAST_RUN"
 os.environ['THEANO_FLAGS'] = "device=gpu"
 os.environ['THEANO_FLAGS'] = "floatX=float32"
 
+import matplotlib
+matplotlib.use('Agg')
+
 import theano
 import theano.tensor as T
 import lasagne
