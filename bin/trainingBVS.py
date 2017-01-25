@@ -167,7 +167,7 @@ def main():
             w_t = w_t + dw_t
             e_t = func(w_t.astype('float32') , *train_data)
             e_it[i] = e_t
-            if(i % 50 == 0):
+            if((i>10) and (i % 50 == 0)):
                 train_data = sampleData(valid_windows,n_samples,x_image,  t_image,winSize,ImageShape,x_mean, x_std)
                 print("i: {}, e_t: {}, time: {}".format(i, e_t, time.ctime()))
             de_it[i] = numpy.abs(dw_t).mean()
