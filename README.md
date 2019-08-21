@@ -20,4 +20,4 @@ Is is necessary to download the [DRIVE database](http://www.isi.uu.nl/Research/D
 
 ### Who do I talk to? ###
 
-* Sebastián Cepeda [sebastian.cepeda.fuentealba@outlook.com](sebastian.cepeda.fuentealba@outlook.com)
+* Sebastian Cepeda [sebastian.cepeda.fuentealba@gmail.com](sebastian.cepeda.fuentealba@gmail.com)
